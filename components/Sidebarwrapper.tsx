@@ -10,8 +10,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { Sidebar } from "@/components/Sidebar";
-import { ModeToggle } from '@/components/ui/ThemTogle';
-export default  function layout({children}:{children:ReactNode}) {
+export default  function Sidebarwrapper({children}:{children:ReactNode}) {
 
 
 
@@ -45,10 +44,8 @@ const [showNotification, setShowNotification] = useState(true);
           </button>
         </div>
       )}
-
       <Outlet />
-      <div className='w-full flex justify-end items-center'></div>
-    {children}
+      {children}
     </main>
   </div>
   );
