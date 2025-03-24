@@ -30,7 +30,7 @@ const [showNotification, setShowNotification] = useState(true);
     <main className={`flex-1 overflow-auto transition-all duration-300 ${
       isSidebarExpanded ? 'ml-64' : 'ml-20'
     }`}>
-      {showNotification && (
+      {false && (
         <div className="bg-blue-50 p-4 m-4 rounded-lg border border-blue-100 flex items-center justify-between animate-fade-in">
           <div className="flex items-center space-x-3">
             <Bell className="w-5 h-5 text-blue-500" />

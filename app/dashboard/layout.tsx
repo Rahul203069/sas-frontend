@@ -25,7 +25,6 @@ const user=await prisma.user.findUnique({where:{id:session.user.id}})
 if(!user){
     redirect('/login')
 }
-
     
   return (
     <div>{children}</div>

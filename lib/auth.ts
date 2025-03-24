@@ -22,32 +22,42 @@ declare module "next-auth" {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   secret: process.env.SECRET,
   pages: {
     signIn: "/signup", // Custom sign-in page
   },
   callbacks: {
     async signIn({ user }) {
-      if (!user || !user.email) return false; // Ensure user has an email
+      try{
 
-      // Check if user exists in the database
-      const existingUser = await prisma.user.findUnique({
-        where: { email: user.email },
-      });
-
-      if (!existingUser) {
-        // Create user if they don't exist
-        await prisma.user.create({
-          data: {
-            name: user.name || "Unknown",
-            email: user.email,
-            image: user.image || "",
-            password: "defaultPassword", // Add a default password or generate one
-          },
+        if (!user || !user.email) return false; // Ensure user has an email
+        
+        // Check if user exists in the database
+        const existingUser = await prisma.user.findUnique({
+          where: { email: user.email },
         });
+        
+        if (!existingUser) {
+          // Create user if they don't exist
+          await prisma.user.create({
+            data: {
+              name: user.name || "Unknown",
+              email: user.email,
+              image: user.image || "",
+              password: "defaultPassword", // Add a default password or generate one
+            },
+          });
+        }
+        
+        return true; // Allow sign-in
+      } catch (error) {
+        console.error('error',error);
+        return false;
       }
-
-      return true; // Allow sign-in
     },
     async session({ session }) {
       if (session?.user?.email) {
@@ -63,7 +73,7 @@ declare module "next-auth" {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      return `${baseUrl}/csv-upload`; // Redirect to /home after sign-in
+      return `${baseUrl}/dashboard`; // Redirect to /home after sign-in
     },
   },
 };

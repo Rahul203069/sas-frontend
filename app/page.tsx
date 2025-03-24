@@ -46,7 +46,7 @@ const [showNotification, setShowNotification] = useState(true);
         </div>
       )}
 
-      <Outlet />
+  
       <div className='w-full flex justify-end items-center'></div>
     {children}
     </main>

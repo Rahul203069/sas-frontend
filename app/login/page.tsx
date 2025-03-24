@@ -3,11 +3,13 @@
 import React, { useState } from 'react';
 import { Chrome } from 'lucide-react';
 import { signIn } from 'next-auth/react';
-
+import { useSession } from 'next-auth/react';
 import ClipLoader from "react-spinners/ClipLoader";
 import { toast } from 'sonner';
 
 function page() {
+
+  
 
 const [loader, setloader] = useState(false)
 

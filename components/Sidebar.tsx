@@ -10,7 +10,9 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarClockIcon,
-  LogOut
+  BotMessageSquare,
+  LogOut,
+  icons
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Router } from 'express';
@@ -34,11 +36,16 @@ const navItems = [
     label: 'Leads', 
     href: '/leads' 
   },
+  {icon: BotMessageSquare,
+    label:'Bot',
+    herf:'/bot'
+  },
   {
     icon: CalendarClockIcon, 
     label: 'Appointments', 
     href: '/appointments' 
   },
+
   { 
     icon: Settings, 
     label: 'Settings', 
