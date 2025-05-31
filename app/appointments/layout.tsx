@@ -1,3 +1,5 @@
+
+//@ts-nocheck
 import React, { ReactNode } from 'react'
 import {PrismaClient} from '@prisma/client'
 import { getServerSession } from 'next-auth';
@@ -6,6 +8,10 @@ import { redirect } from 'next/navigation';
 const prisma= new PrismaClient();
 
 const layout = async({children}:{children:ReactNode}) => {
+
+
+
+    
 
     const user = await getServerSession(authOptions);
 console.log('user in appointments',user);

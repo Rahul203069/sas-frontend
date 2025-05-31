@@ -1,3 +1,4 @@
+//@ts-nocheck
 "use client";
 import ChatbotConfig from "@/components/ChatbotConfig";
 import Sidebarwrapper from "@/components/Sidebarwrapper";

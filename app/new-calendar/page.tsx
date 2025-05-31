@@ -5,6 +5,7 @@ import { Calendar, ArrowRight } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import clsx from 'clsx';
 import Image from 'next/image'
+import { useState } from 'react';
 import { FcGoogle } from "react-icons/fc";
 import { Sidebar } from '@/components/Sidebar';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
@@ -12,14 +13,16 @@ import { google } from 'googleapis';
 import axios from 'axios';
 
 import { useRouter } from 'next/navigation';
+import ClipLoader from 'react-spinners/ClipLoader';
 function App() {
-
+const [loader, setloader] = useState(false)
 
     const router= useRouter()
   const handleGoogleCalendarConnect = () => {
-    
+    setloader(true)
     axios.get("/api/auth/google-calendar").then((res) => {
-    router.push(res.data.redirect)
+    router.push(res.data.redirect);
+    setloader(false);
     })
   };
 
@@ -52,13 +55,12 @@ function App() {
             )}
             >
             <div className="flex items-center gap-4 cursor-pointer">
-            <Image 
+          {loader?<ClipLoader color="#0000FF" />:<Image 
   src="/icons8-google-calendar-48.png"
   alt="Google Calendar"
   width={48}
   height={48}
-/>
-              <div className="text-left">
+/>}                <div className="text-left">
                 <p className="font-semibold text-gray-900">Google Calendar</p>
                 <p className="text-sm text-gray-600">Connect your Google Calendar</p>
               </div>

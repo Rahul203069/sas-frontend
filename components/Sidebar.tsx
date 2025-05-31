@@ -2,6 +2,7 @@
 "use client"
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { signOut } from 'next-auth/react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -29,32 +30,32 @@ const navItems = [
   { 
     icon: LayoutDashboard, 
     label: 'Dashboard', 
-    href: '/dashboard' 
+    href: 'http://localhost:3000/dashboard' 
   },
   { 
     icon: Users, 
     label: 'Leads', 
-    href: '/leads' 
+    href: 'http://localhost:3000/leads' 
   },
   {icon: BotMessageSquare,
     label:'Bot',
-    herf:'/bot'
+    herf:'http://localhost:3000/bot'
   },
   {
     icon: CalendarClockIcon, 
     label: 'Appointments', 
-    href: '/appointments' 
+    href: 'http://localhost:3000/appointments' 
   },
 
   { 
     icon: Settings, 
     label: 'Settings', 
-    href: '/settings' 
+    href: 'http://localhost:3000/settings' 
   },
   { 
     icon: CreditCard, 
     label: 'Billing', 
-    href: '/billing' 
+    href: 'http://localhost:3000/billing' 
   },
 ];
 
@@ -133,7 +134,7 @@ const pathname= usePathname()
 
         <div className="p-4 border-t border-gray-200">
           <button
-            onClick={()=>{}}
+            onClick={()=>{ signOut({callbackUrl: '/login'})}}
             className={cn(
               "w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300",
               "text-red-600 hover:bg-red-50 hover:scale-[1.02] active:scale-[0.98]",

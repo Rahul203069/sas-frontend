@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 import { google } from "googleapis";
 import { NextApiRequest, NextApiResponse } from "next";
 import { redirect } from "next/dist/server/api-utils";

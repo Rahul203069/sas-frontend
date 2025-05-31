@@ -1,4 +1,4 @@
-
+//@ts-nocheck
 "use client"
 import React, { Dispatch, SetStateAction, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,7 +7,7 @@ import { Bot, MessageSquare, Calendar, Plus, Minus, Settings, Info, ChevronDown 
 import { ConfigureBot } from '@/app/action';
 import { toast } from 'sonner';
 import SpinningIcon from './ui/SpinningIcon';
-
+import { useRouter } from 'next/navigation';
 interface EnrichmentQuestion {
   id: string;
   question: string;
@@ -51,7 +51,7 @@ export default function ChatbotConfig({ setrelode, config,setclose }) {
     }
     return [{ id: '1', question: '' }];
   });
-
+const router=useRouter();
   const { register, handleSubmit, watch, setValue, getValues } = useForm<Chatbotconfig>({
     defaultValues: {
       leadType: 'buyer',
@@ -78,23 +78,28 @@ export default function ChatbotConfig({ setrelode, config,setclose }) {
 
   const addEnrichmentQuestion = () => {
     const newQuestion = { id: Date.now().toString(), question: '' };
-    setEnrichmentQuestions([...enrichmentQuestions, newQuestion]);
-    
-    // Also update the form values
-    const currentIndex = enrichmentQuestions.length;
-    setValue(`enrichmentQuestions.${currentIndex}`, newQuestion);
+  
+    setEnrichmentQuestions((prevQuestions) => {
+      const updatedQuestions = [...prevQuestions, newQuestion];
+      
+      // Use the question ID as the key instead of index
+      setValue(`enrichmentQuestions.${newQuestion.id}`, newQuestion);
+  
+      return updatedQuestions;
+    });
   };
+  
+
 
   const removeEnrichmentQuestion = (id: string) => {
-    const updatedQuestions = enrichmentQuestions.filter(q => q.id !== id);
-    setEnrichmentQuestions(updatedQuestions);
-    
-    // Update form values to match the state
-    updatedQuestions.forEach((question, index) => {
-      setValue(`enrichmentQuestions.${index}`, question);
+    setEnrichmentQuestions((prevQuestions) => {
+      const updatedQuestions = prevQuestions.filter((q) => q.id !== id);
+  
+      // Remove the specific question from the form
+      setValue(`enrichmentQuestions.${id}`, undefined);
+  
+      return updatedQuestions;
     });
-    // Clear any extra values
-    setValue('enrichmentQuestions', updatedQuestions);
   };
 
   const onSubmit = async (data: Chatbotconfig) => {
@@ -104,13 +109,15 @@ export default function ChatbotConfig({ setrelode, config,setclose }) {
     data.enrichmentQuestions = enrichmentQuestions;
     
     const createbot = await ConfigureBot(data);
+      console.log(createbot,createbot);
 
+    window.location.reload();
     if (createbot?.error) {
       toast(createbot?.error);
     }
     if (createbot?.success) {
       setrelode(prev => !prev);
-      setclose(false)
+  
       toast('Bot created successfully');
     }
     setloader(false);
@@ -178,7 +185,7 @@ export default function ChatbotConfig({ setrelode, config,setclose }) {
                             key={type}
                             type="button"
                             onClick={() => {
-                              setValue('leadType', type as 'buyer' | 'seller');
+                              setValue('leadType', type as 'seller' | 'buyer');
                               setIsLeadTypeOpen(false);
                             }}
                             className={`w-full px-4 py-3 text-left capitalize hover:bg-gray-50 transition-colors ${

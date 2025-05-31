@@ -29,9 +29,10 @@ model User {
   areacode      String?
   phonenumber   String?
    googlecalendarmetadata  Json?
+  timeZone   String?
  buyerbot       BuyerBot?
  sellerbot      SellerBot?  
-  
+  availabaleSlots Json?
   phoneverifed   Boolean @default(false)
   // One-to-one relation with Twilio
   twilio       Twilio?
@@ -164,14 +165,25 @@ model Testchat {
 id String  @id @default(uuid())
 buyerbotid  String? @unique
 sellerbotid String? @unique
-userid    String   
+userid    String 
+  
 type    String
-message   Json?     
+message   Json?  
+availableslots Json?
+generatedslots Json?
+suggestedslots Json?
+   
 
 
 
 }
 
+
+  model testdata{
+  id String @id @default(uuid())
+  data String?
+  name String?
+  }
 
 model EnrichmentQuestion {
   id       String @id @default(uuid())
@@ -189,6 +201,7 @@ model BuyerBot {
   bussinessinfo     String
   enrichment        EnrichmentQuestion[] @relation("BuyerBotEnrichment")
   appointmentsetter Boolean 
+
   islive            Boolean @default(false)
   startingmessage   String
   prompt            String?

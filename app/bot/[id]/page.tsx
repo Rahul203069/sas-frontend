@@ -26,7 +26,7 @@ const BotConfigPage = () => {
       const chat =  await IntiateTestchat(id, type);
       if(chat){
         
-        console.log
+        
 
         setchatid(chat.id)
       }

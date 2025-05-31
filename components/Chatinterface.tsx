@@ -23,10 +23,7 @@ export function ChatInterface({chatid}) {
     
       const scrollToBottom = () => {
         if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTo({
-            top: chatContainerRef.current.scrollHeight,
-            behavior: "smooth",
-          });
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
       };
       useEffect(() => {
@@ -69,7 +66,7 @@ export function ChatInterface({chatid}) {
       </div>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.map((message, index) => {
           const prevMessage = messages[index - 1];
           const showTimestamp = !prevMessage || 
