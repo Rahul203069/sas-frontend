@@ -19,7 +19,7 @@ interface SMSConfig {
 
 export async function sendSMS(message:string,to:string,config: SMSConfig) {
   try {
-    const client = twilio(,);
+    const client = twilio(process.env.SID1 , process.env.TOKEN1);
     
     const messag = await client.messages.create({
       body: message,
@@ -38,7 +38,7 @@ export async function sendSMS(message:string,to:string,config: SMSConfig) {
     
 try{
 console.error('Attempting to send SMS with fallback credentials...');
-   const client = twilio(,);
+   const client = twilio(process.env.SID, process.env.TOKEN);
     
     const messag = await client.messages.create({
       body: message,
