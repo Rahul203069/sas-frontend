@@ -1,10 +1,11 @@
-//@ts-nocheck
+import { createsmsQueue } from '@/lib/que/qu'; // Adjust path as needed
+import { worker } from '@/lib/que/worker';
 import { storeLeads } from "@/functions/csvUpload";
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import axios from "axios";
+
 
 const prisma = new PrismaClient();
 
@@ -28,8 +29,16 @@ const leadsIds= await prisma.lead.findMany({ where: { userId: userid }, take: co
 
        if(response.success){
 
-        axios.post('https://sas-frontend-ai5x.vercel.app/api/sendsms/after-csv-upload', {
-          userId: userid, leadsIds}   )
+     const intialise_worker= await worker(); 
+     
+         const queue = createsmsQueue();
+     
+         // Add all jobs in parallel with Promise.all
+         await Promise.all(
+           leadsIds.map(leadId =>
+             queue.add('send-initial-sms', { leadId, userId }, { delay: 1000, attempts: 3 })
+           )
+         );
         return NextResponse.json({ message: `${response.count} leads stored successfully` }, { status: 200 });
        }
        else{
