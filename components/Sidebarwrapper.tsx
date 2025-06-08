@@ -1,7 +1,7 @@
-//@ts-nocheck
+
 "use client"
 import React, { ReactNode, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+
 import { Bell, X } from 'lucide-react';
 
 

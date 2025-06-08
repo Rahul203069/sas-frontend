@@ -21,7 +21,7 @@ import { ReceiptEuro, Truck } from 'lucide-react';
 
 import Anthropic from "@anthropic-ai/sdk/index.mjs";
 import ChatbotConfig from '@/components/ChatbotConfig';
-import { response } from 'express';
+
 import { datacatalog } from 'googleapis/build/src/apis/datacatalog';
 import { get } from 'http';
 import { extractGeneratedSlots } from '@/utils';
