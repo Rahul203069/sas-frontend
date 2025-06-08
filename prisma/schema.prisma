@@ -68,10 +68,12 @@ model Lead {
   name         String
   email        String[] 
   phone        String[]
+  address      String
   status       LeadStatus @default(JUNK)
   source       LeadSource
-data    Json
-  assignedTo   User?      @relation(fields: [userId], references: [id])
+   data    Json?
+   initiated   Boolean @default(false)
+  owner   User      @relation(fields: [userId], references: [id])
   userId       String
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
