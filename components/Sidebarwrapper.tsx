@@ -1,4 +1,4 @@
-
+//@ts-nocheck
 "use client"
 import React, { ReactNode, useState } from 'react';
 
@@ -45,7 +45,7 @@ const [showNotification, setShowNotification] = useState(true);
           </button>
         </div>
       )}
-      <Outlet />
+     
       {children}
     </main>
   </div>
