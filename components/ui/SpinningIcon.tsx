@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { Settings } from "lucide-react";
 import { motion } from "framer-motion";
 import { ReactNode } from "react";

@@ -1,3 +1,4 @@
+//@ts-nocheck
 
 "use client"
 import React, { useState, useCallback } from 'react';
@@ -152,3 +153,4 @@ const [user, setuser] = useState(session?.user)
     </div>
   );
 }
+

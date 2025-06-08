@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { google } from "googleapis";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";

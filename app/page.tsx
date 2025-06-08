@@ -1,6 +1,6 @@
 "use client"
 import React, { ReactNode, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+
 import { Bell, X } from 'lucide-react';
 
 
@@ -11,7 +11,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { Sidebar } from "@/components/Sidebar";
 import { ModeToggle } from '@/components/ui/ThemTogle';
-export default  function layout({children}:{children:ReactNode}) {
+export default function Home() {
 
 
 
@@ -48,7 +48,6 @@ const [showNotification, setShowNotification] = useState(true);
 
   
       <div className='w-full flex justify-end items-center'></div>
-    {children}
     </main>
   </div>
   );

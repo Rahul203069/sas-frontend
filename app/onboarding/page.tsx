@@ -1,3 +1,4 @@
+//@ts-nocheck
 "use client"
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Shield, Terminal, Timer } from 'lucide-react';

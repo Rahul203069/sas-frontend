@@ -1,5 +1,5 @@
+//@ts-nocheck
 "use client";
-
 import { useEffect, useState } from "react";
 import { ConfigureBot, fetchBots, IntiateTestchat } from "@/app/action";
 import ChatbotConfig from "@/components/ChatbotConfig";

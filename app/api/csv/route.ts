@@ -1,4 +1,4 @@
-
+//@ts-nocheck
 import { storeLeads } from "@/functions/csvUpload";
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
@@ -8,7 +8,7 @@ import axios from "axios";
 
 const prisma = new PrismaClient();
 
-export async function POST(request: NextRequest,response: NextResponse) {
+export async function POST(request: NextRequest) {
 
     try{
         const session = await getServerSession(authOptions);

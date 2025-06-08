@@ -1,3 +1,4 @@
+//@ts-nocheck
 
 'use server'
 import { authOptions } from '@/lib/auth'

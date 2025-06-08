@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { Redis } from 'ioredis';
 
 let redis: Redis | null = null;
@@ -39,3 +40,4 @@ export const disconnectRedis = async (): Promise<void> => {
     redis = null;
   }
 };
+

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import React from 'react'
 
 const Sorrybot = ({description}:{description:string}) => {

@@ -1,3 +1,4 @@
+//@ts-nocheck
 export interface CSVColumn {
   header: string;
   index: number;

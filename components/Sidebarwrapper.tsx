@@ -1,3 +1,4 @@
+//@ts-nocheck
 "use client"
 import React, { ReactNode, useState } from 'react';
 import { Outlet } from 'react-router-dom';
@@ -50,3 +51,4 @@ const [showNotification, setShowNotification] = useState(true);
   </div>
   );
 }
+

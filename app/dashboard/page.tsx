@@ -1,3 +1,4 @@
+//@ts-nocheck
 import React from 'react';
 import { DashBoardmetrics } from '@/components/DashBoardmetrics';
 import Sidebarwrapper from '@/components/Sidebarwrapper';

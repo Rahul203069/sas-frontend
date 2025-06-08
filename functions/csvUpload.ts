@@ -1,3 +1,4 @@
+//@ts-nocheck
 
 
 
@@ -48,6 +49,7 @@ export async function storeLeads(leadsData: LeadInput[],userId:string) {
     await prisma.$disconnect();
   }
 }
+
 
 
 

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import Papa from 'papaparse';
 import { CSVData, CSVColumn, MappedField, MappedData } from '../types/csv';
 

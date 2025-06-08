@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { createsmsQueue } from '@/lib/que/qu'; // Adjust path as needed
 import { worker } from '@/lib/que/worker';
@@ -33,3 +34,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

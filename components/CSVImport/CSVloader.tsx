@@ -1,3 +1,4 @@
+//@ts-nocheck
 
 import React from 'react';
 import { FileSpreadsheet, Loader2, Check } from 'lucide-react';

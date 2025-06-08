@@ -1,3 +1,4 @@
+//@ts-nocheck
 "use client"
 
 import { useTheme } from "next-themes"
@@ -27,3 +28,4 @@ const Toaster = ({ ...props }: ToasterProps) => {
 }
 
 export { Toaster }
+

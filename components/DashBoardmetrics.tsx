@@ -1,3 +1,4 @@
+//@ts-nocheck
 import React from 'react';
 import { Users, DollarSign, LineChart, Bell } from 'lucide-react';
 

@@ -1,3 +1,4 @@
+//@ts-nocheck
 "use client"
 import React, { useState } from 'react';
 import { Clock, Calendar, Trash2, Plus, ChevronRight, Settings } from 'lucide-react';

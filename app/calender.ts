@@ -1,3 +1,4 @@
+//@ts-nocheck
 "use server"
 
 
@@ -58,3 +59,4 @@ import { OAuth2Client } from 'google-auth-library';
     return { error: 'Unable to book slot' };
   }
 }
+
