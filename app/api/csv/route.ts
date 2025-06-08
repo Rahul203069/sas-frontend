@@ -28,7 +28,7 @@ const leadsIds= await prisma.lead.findMany({ where: { userId: userid }, take: co
 
        if(response.success){
 
-        axios.post('api/sendsms/after-csv-upload', {
+        axios.post('https://sas-frontend-ai5x.vercel.app/api/sendsms/after-csv-upload', {
           userId: userid, leadsIds}   )
         return NextResponse.json({ message: `${response.count} leads stored successfully` }, { status: 200 });
        }
