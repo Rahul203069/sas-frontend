@@ -336,6 +336,7 @@ export async function sendotp(phonenumber:string) {
           from: '+16187624119',
           to: phonenumber,
         });
+        console.log(success, 'sms sent successfully');
 
         if(success){
 

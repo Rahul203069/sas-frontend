@@ -17,7 +17,7 @@ if(!session?.user?.id){
     return (
 
         <div>
-            {JSON.stringify(session)}
+           
             {children}</div>
       )
 }
