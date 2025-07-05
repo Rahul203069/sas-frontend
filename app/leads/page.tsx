@@ -79,7 +79,12 @@ function page() {
 
     <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
-     
+      <div className="p-8">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Leads</h1>
+      <div className="bg-white rounded-xl p-6 shadow-sm">
+        <p className="text-gray-600">Leads management page coming soon...</p>
+      </div>
+    </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
