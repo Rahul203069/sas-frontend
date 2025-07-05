@@ -1,4 +1,4 @@
-import { Appointment } from '../types/appointment';
+import { Appointment } from '../type/appointment';
 
 const services = [
   'Marketing Consultation',
