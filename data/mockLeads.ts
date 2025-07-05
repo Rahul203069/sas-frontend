@@ -1,4 +1,4 @@
-import { Lead } from '../types/lead';
+import { Lead } from '../type/lead';
 
 export const mockLeads: Lead[] = [
   {
