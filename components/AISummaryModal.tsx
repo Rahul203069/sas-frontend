@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Brain, TrendingUp, MessageCircle, Calendar, Target, AlertCircle, CheckCircle } from 'lucide-react';
-import { Lead } from '../types/lead';
+import { Lead } from '../type/lead';
 
 interface AISummaryModalProps {
   lead: Lead;

@@ -528,11 +528,7 @@ Parse the user's availability and generate an array of time slots based on the f
 3. Generate at least 1 and at most 10 time slots.
 4. Try to generate as many slots as possible within these constraints.
 5. If the user provides a specific date, try to generate slots around that date.
-7. the time slots be equal spaced by 30 minutes.
-8. the max time should be 9 pm so time slot should be generated beyond 9 pm.
-8.try to generate as many slots as possible within these constraints.
-9. even though the user provide specific date you have to genrate multiple slots within the given time-constraints.
-10.once a user booked a slot tell them that the appointment is set and you will call them on the given date and time.
+7. even though the user provide specific date you have to genrate multiple slots within the given time-constraints.
 For example:
 - "free after 5" might generate slots like "2023-05-25T17:00:00", "2023-05-25T18:00:00", etc.
 - "free on the weekends" might generate slots like "2023-05-27T10:00:00", "2023-05-27T14:00:00", "2023-05-28T11:00:00", etc.
@@ -548,7 +544,9 @@ After generating the time slots, indicate that it's time to run the backend func
 "2025-04-27T19:00:00"
 ]
 </generated_slots>
-
+<available_slots>
+["2023-08-19T17:00:00","2023-08-20T17:00:00"]
+</available_slots>
 <run_function>check_availability</run_function>
 
 
@@ -1051,7 +1049,9 @@ After generating the time slots, indicate that it's time to run the backend func
 "2025-04-27T19:00:00"
 ]
 </generated_slots>
-
+<available_slots>
+["2023-08-19T17:00:00","2023-08-20T17:00:00"]
+</available_slots>
 <run_function>check_availability</run_function>
 
 

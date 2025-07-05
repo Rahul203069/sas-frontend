@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, MessageCircle, User, Bot, Clock } from 'lucide-react';
-import { Lead } from '../types/lead';
+import { Lead } from '../type/lead';
 
 interface ChatHistoryModalProps {
   lead: Lead;
