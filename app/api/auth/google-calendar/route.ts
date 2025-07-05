@@ -5,8 +5,8 @@ import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
 
 const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.ID,
+  process.env.SECRET,
   process.env.NEXT_PUBLIC_BASE_URL + "/api/auth/google-calendar/callback"
 );
 
