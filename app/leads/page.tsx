@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useMemo } from 'react';
-import { Bot, Bell, Settings, User, Users } from 'lucide-react';
+import { Bot, Bell, Settings, User, Users, Upload } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import LeadCard from '@/components/LeadCard';
 import LeadFilters from '@/components/LeadFilters';
 import StatsOverview from '@/components/StatsOverview';
@@ -9,7 +10,9 @@ import AISummaryModal from '@/components/AISummaryModal';
 import { mockLeads } from '@/data/mockLeads';
 import { Lead } from '@/type/lead';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
+
 function page() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('score');
@@ -74,73 +77,85 @@ function page() {
     console.log(`Booking call for lead ${leadId}`);
   };
 
+  const handleImportLeads = () => {
+    router.push('/csv-upload');
+  };
+
   return (
     <Sidebarwrapper>
-
-    <div className="min-h-screen bg-gray-50/50">
-      {/* Header */}
-      <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Leads</h1>
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <p className="text-gray-600">Leads management page coming soon...</p>
-      </div>
-    </div>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
-        {/* Stats Overview */}
-        <StatsOverview {...stats} />
-
-        {/* Filters */}
-        <LeadFilters
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          sortBy={sortBy}
-          onSortChange={setSortBy}
-        />
-
-        {/* Leads List */}
-        <div className="space-y-3">
-          {filteredAndSortedLeads.map((lead) => (
-            <LeadCard
-            key={lead.id}
-            lead={lead}
-            onViewChat={handleViewChat}
-            onViewSummary={handleViewSummary}
-            onBookCall={handleBookCall}
-            />
-          ))}
+      <div className="min-h-screen bg-gray-50/50">
+        {/* Header */}
+        <div className="p-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
+            <button
+              onClick={handleImportLeads}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+            >
+              <Upload className="w-4 h-4" />
+              Import Leads
+            </button>
+          </div>
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+           
+          </div>
         </div>
 
-        {filteredAndSortedLeads.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-gray-300 mb-4">
-              <Users className="w-12 h-12 mx-auto" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
-            <p className="text-gray-500 text-sm">Try adjusting your search or filter criteria.</p>
-          </div>
-        )}
-      </main>
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
+          {/* Stats Overview */}
+          <StatsOverview {...stats} />
 
-      {/* Modals */}
-      {selectedLeadForChat && (
-        <ChatHistoryModal
-        lead={selectedLeadForChat}
-          onClose={() => setSelectedLeadForChat(null)}
+          {/* Filters */}
+          <LeadFilters
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+          />
+
+          {/* Leads List */}
+          <div className="space-y-3">
+            {filteredAndSortedLeads.map((lead) => (
+              <LeadCard
+              key={lead.id}
+              lead={lead}
+              onViewChat={handleViewChat}
+              onViewSummary={handleViewSummary}
+              onBookCall={handleBookCall}
+              />
+            ))}
+          </div>
+
+          {filteredAndSortedLeads.length === 0 && (
+            <div className="text-center py-16">
+              <div className="text-gray-300 mb-4">
+                <Users className="w-12 h-12 mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
+              <p className="text-gray-500 text-sm">Try adjusting your search or filter criteria.</p>
+            </div>
+          )}
+        </main>
+
+        {/* Modals */}
+        {selectedLeadForChat && (
+          <ChatHistoryModal
+          lead={selectedLeadForChat}
+            onClose={() => setSelectedLeadForChat(null)}
+            />
+          )}
+
+        {selectedLeadForSummary && (
+          <AISummaryModal
+          lead={selectedLeadForSummary}
+          onClose={() => setSelectedLeadForSummary(null)}
           />
         )}
-
-      {selectedLeadForSummary && (
-        <AISummaryModal
-        lead={selectedLeadForSummary}
-        onClose={() => setSelectedLeadForSummary(null)}
-        />
-      )}
-    </div>
-      </Sidebarwrapper>
+      </div>
+    </Sidebarwrapper>
   );
 }
 
