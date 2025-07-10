@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   try {
     // Parse the incoming form data from Twilio
     const body = await request.text();
+    console.log('Raw body:', body);
     const params = new URLSearchParams(body);
     
     // Extract message details from Twilio webhook
