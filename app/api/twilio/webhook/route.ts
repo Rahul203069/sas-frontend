@@ -1,40 +1,164 @@
+
+
+import { NextResponse } from 'next/server';
+import twilio from 'twilio';
+
+// Twilio credentials (store these in environment variables)
+const accountSid = process.env.SID;
+const authToken = process.env.TOKEN;
+const twilioPhoneNumber = '+15592457719';
+
+// Initialize Twilio client
+const client = twilio(accountSid, authToken);
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    console.log("Received webhook data:", body);
+    // Parse the incoming form data from Twilio
+    const body = await request.text();
+    const params = new URLSearchParams(body);
+    
+    // Extract message details from Twilio webhook
+    const messageData = {
+      messageSid: params.get('MessageSid'),
+      accountSid: params.get('AccountSid'),
+      from: params.get('From'),
+      to: params.get('To'),
+      body: params.get('Body'),
+      numMedia: params.get('NumMedia'),
+      timestamp: new Date().toISOString()
+    };
 
-    // Process the webhook data as needed
-    // For example, you can save it to a database or perform some action
+    console.log('Received SMS:', messageData);
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Validate the webhook (optional but recommended)
+    const twilioSignature = request.headers.get('x-twilio-signature');
+    const url = request.url;
+    
+    // Uncomment below for signature validation
+    // const isValid = twilio.validateRequest(
+    //   authToken,
+    //   twilioSignature,
+    //   url,
+    //   body
+    // );
+    
+    // if (!isValid) {
+    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
+    // }
+
+    // Process the message based on content
+    let responseMessage = '';
+    const incomingMessage = messageData.body.toLowerCase().trim();
+console.log('Incoming message:', incomingMessage);
+    // Basic auto-responder logic
+    if (incomingMessage.includes('hello') || incomingMessage.includes('hi')) {
+      responseMessage = 'Hello! Thanks for contacting us. How can we help you today?';
+    } else if (incomingMessage.includes('help') || incomingMessage.includes('support')) {
+      responseMessage = 'We\'re here to help! Please describe your issue and we\'ll get back to you soon.';
+    } else if (incomingMessage.includes('hours') || incomingMessage.includes('open')) {
+      responseMessage = 'Our business hours are Monday-Friday 9AM-6PM PST. We\'ll respond to your message during business hours.';
+    } else if (incomingMessage.includes('pricing') || incomingMessage.includes('price')) {
+      responseMessage = 'Thanks for your interest in our pricing! Please visit our website or call us for detailed pricing information.';
+    } else {
+      responseMessage = 'Thanks for your message! We\'ve received it and will get back to you soon.';
+    }
+
+    // Send automated response (optional)
+    if (responseMessage) {
+      await client.messages.create({
+        body: responseMessage,
+        from: twilioPhoneNumber,
+        to: messageData.from
+      });
+    }
+
+    // Store message in database (implement your database logic here)
+    await storeMessageInDatabase(messageData);
+
+    // Send notification to your team (implement your notification logic here)
+    await notifyTeam(messageData);
+
+    // Return TwiML response (optional - for more complex responses)
+    const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+      <Message>
+        <Body>${responseMessage}</Body>
+      </Message>
+    </Response>`;
+
+    return new Response(twimlResponse, {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        'Content-Type': 'text/xml',
+      },
     });
+
   } catch (error) {
-    console.error("Error processing webhook:", error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error('Error processing Twilio webhook:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-export async function GET(request: Request) {
+
+// GET method for testing webhook endpoint
+export async function GET() {
+  return NextResponse.json({ 
+    message: 'Twilio webhook endpoint is working',
+    timestamp: new Date().toISOString()
+  });
+}
+
+// Helper function to store message in database
+async function storeMessageInDatabase(messageData) {
   try {
-    const body = await request.json();
-    console.log("Received webhook data:", body);
-
-    // Process the webhook data as needed
-    // For example, you can save it to a database or perform some action
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Example with Prisma (adjust based on your database)
+    // await prisma.message.create({
+    //   data: {
+    //     messageSid: messageData.messageSid,
+    //     from: messageData.from,
+    //     to: messageData.to,
+    //     body: messageData.body,
+    //     timestamp: messageData.timestamp,
+    //   },
+    // });
+    
+    // Example with MongoDB
+    // await db.collection('messages').insertOne(messageData);
+    
+    console.log('Message stored in database:', messageData.messageSid);
   } catch (error) {
-    console.error("Error processing webhook:", error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error('Error storing message in database:', error);
+  }
+}
+
+// Helper function to notify your team
+async function notifyTeam(messageData) {
+  try {
+    // Send email notification
+    // await sendEmail({
+    //   to: 'team@yourcompany.com',
+    //   subject: 'New SMS Received',
+    //   html: `
+    //     <h3>New SMS Message</h3>
+    //     <p><strong>From:</strong> ${messageData.from}</p>
+    //     <p><strong>Message:</strong> ${messageData.body}</p>
+    //     <p><strong>Time:</strong> ${messageData.timestamp}</p>
+    //   `
+    // });
+
+    // Send Slack notification
+    // await sendSlackMessage({
+    //   channel: '#customer-messages',
+    //   text: `New SMS from ${messageData.from}: ${messageData.body}`
+    // });
+
+    // Send push notification
+    // await sendPushNotification({
+    //   title: 'New SMS Received',
+    //   body: `From ${messageData.from}: ${messageData.body}`
+    // });
+
+    console.log('Team notified about new message');
+  } catch (error) {
+    console.error('Error notifying team:', error);
   }
 }
