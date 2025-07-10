@@ -315,7 +315,7 @@ export async function sendotp(phonenumber:string) {
     console.log(phonenumber);
 
     console.log(accountSid,authToken)
-      const client = twilio(process.env.SID1, process.env.TOKEN1);
+      const client = twilio(process.env.SID, process.env.TOKEN);
 
     const session = await getServerSession(authOptions)
     if(!session?.user.id){
@@ -333,7 +333,7 @@ export async function sendotp(phonenumber:string) {
 
     const success=    await client.messages.create({
           body: `  hey,${user.otp} is your one-time-password to verfiy you phone number ,Thankyou  `,
-          from: '+16187624119',
+          from: '+15592457719',
           to: phonenumber,
         });
         console.log(success, 'sms sent successfully');
