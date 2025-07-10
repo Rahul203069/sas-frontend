@@ -332,7 +332,7 @@ export async function sendotp(phonenumber:string) {
     
 
     const success=    await client.messages.create({
-          body: `  hey,${user.otp} is your one-time-password to verfiy you phone number ,Thankyou  `,
+          body: `  hey,${user.otp} is your one-time-password to verfiy you phone number ,  heheheh bchsbdh jhbcq Thankyou  `,
           from: '+15592457719',
           to: phonenumber,
         });
