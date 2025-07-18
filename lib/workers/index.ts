@@ -1,900 +1,812 @@
-const Redis = require('ioredis');
-const { EventEmitter } = require('events');
+//@ts-nocheck
+
+
+// BullMQ Queue System with Dead Letter Queue, Exponential Backoff, and Error Handling
+// This implementation uses BullMQ for production-ready queue management with Redis backing
+
+import { Queue, Worker as BullMQWorker, QueueEvents } from 'bullmq';
+import IORedis from 'ioredis';
+import EventEmitter from 'events';
 
 /**
- * Functional Job Worker Implementation
- * 
- * This approach uses factory functions and closures instead of classes
- * Benefits: More modular, easier to test individual functions, functional programming style
+ * Default configuration for BullMQ queues
  */
-
-/**
- * Create a job worker instance using factory pattern
- * @param {object} config - Worker configuration
- * @returns {object} Worker instance with methods
- */
-function createJobWorker(config = {}) {
-  // Default configuration
-  const defaultConfig = {
-    redis: {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true
-    },
-    queue: {
-      name: config.queueName || 'default_queue',
-      concurrency: config.concurrency || 3,
-      pollInterval: config.pollInterval || 1000,
-      jobTimeout: config.jobTimeout || 30000,
-      maxRetries: config.maxRetries || 3,
-      retryDelay: config.retryDelay || 1000,
-      shutdownTimeout: config.shutdownTimeout || 30000
-    }
-  };
-
-  // Merge user config with defaults
-  const workerConfig = {
-    ...defaultConfig,
-    ...config,
-    queue: { ...defaultConfig.queue, ...config.queue }
-  };
-
-  // Worker state (closure variables)
-  let redis = null;
-  let redisSubscriber = null;
-  let isRunning = false;
-  let isShuttingDown = false;
-  let activeJobs = new Map();
-  let jobHandlers = new Map();
-  let workerPromises = [];
-  let eventEmitter = new EventEmitter();
-
-  // Statistics
-  let stats = {
-    processed: 0,
-    failed: 0,
-    retried: 0,
-    startTime: null
-  };
-
-  // Queue names
-  const queues = {
-    main: `${workerConfig.queue.name}:waiting`,
-    processing: `${workerConfig.queue.name}:processing`,
-    failed: `${workerConfig.queue.name}:failed`,
-    completed: `${workerConfig.queue.name}:completed`,
-    deadLetter: `${workerConfig.queue.name}:dead_letter`
-  };
-
-  /**
-   * Classify error type for better retry strategies
-   * @param {Error} error - The error object
-   * @returns {string} Error classification
-   */
-  function classifyError(error) {
-    const message = error.message.toLowerCase();
-    const code = error.code;
-
-    // Network-related errors
-    if (code === 'ECONNRESET' || code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || 
-        code === 'ENOTFOUND' || message.includes('network') || message.includes('connection')) {
-      return 'network';
-    }
-
-    // Rate limiting errors
-    if (code === 'RATE_LIMITED' || message.includes('rate limit') || 
-        message.includes('too many requests') || error.status === 429) {
-      return 'rate_limit';
-    }
-
-    // Timeout errors
-    if (message.includes('timeout') || message.includes('timed out') || code === 'TIMEOUT') {
-      return 'timeout';
-    }
-
-    // Service unavailable errors
-    if (error.status === 503 || message.includes('service unavailable') || 
-        message.includes('server error') || code === 'SERVICE_UNAVAILABLE') {
-      return 'service_unavailable';
-    }
-
-    // Authentication/Authorization errors (usually non-retryable)
-    if (error.status === 401 || error.status === 403 || 
-        message.includes('unauthorized') || message.includes('forbidden')) {
-      return 'auth_error';
-    }
-
-    // Validation errors (non-retryable)
-    if (error.status === 400 || message.includes('validation') || 
-        message.includes('invalid') || code === 'VALIDATION_ERROR') {
-      return 'validation_error';
-    }
-
-    // Resource not found (usually non-retryable)
-    if (error.status === 404 || message.includes('not found')) {
-      return 'not_found';
-    }
-
-    return 'unknown';
-  }
-
-  /**
-   * Determine if an error should be retried based on its type
-   * @param {Error} error - The error object
-   * @param {string} errorType - Classified error type
-   * @returns {boolean} Whether the error should be retried
-   */
-  function shouldRetryError(error, errorType) {
-    // Non-retryable error types
-    const nonRetryableErrors = [
-      'validation_error',
-      'auth_error',
-      'not_found'
-    ];
-
-    if (nonRetryableErrors.includes(errorType)) {
-      return false;
-    }
-
-    // Check for specific error patterns that shouldn't be retried
-    const message = error.message.toLowerCase();
-    const nonRetryablePatterns = [
-      'invalid json',
-      'malformed request',
-      'missing required field',
-      'permission denied',
-      'access denied'
-    ];
-
-    return !nonRetryablePatterns.some(pattern => message.includes(pattern));
-  }
-
-  /**
-   * Move job to dead letter queue with reason
-   * @param {object} job - Failed job
-   * @param {string} reason - Reason for dead letter placement
-   */
-  async function moveToDeadLetterQueue(job, reason) {
-    const deadLetterJob = {
-      ...job,
-      deadLetterReason: reason,
-      deadLetterTimestamp: new Date().toISOString(),
-      originalQueueName: workerConfig.queue.name
-    };
-
-    await redis.lpush(queues.deadLetter, JSON.stringify(deadLetterJob));
-    
-    logMessage('error', `Job moved to dead letter queue`, {
-      jobId: job.id,
-      reason,
-      attempts: job.attempts
-    });
-  }
-
-  /**
-   * Enhanced execute function with timeout and graceful degradation
-   * @param {Promise} promise - Promise to execute
-   * @param {number} timeout - Timeout in milliseconds
-   * @param {object} fallbackOptions - Options for graceful degradation
-   */
-  async function executeWithTimeout(promise, timeout, fallbackOptions = {}) {
-    const timeoutController = new AbortController();
-    
-    const timeoutPromise = new Promise((_, reject) => {
-      const timeoutId = setTimeout(() => {
-        timeoutController.abort();
-        reject(new Error(`Operation timed out after ${timeout}ms`));
-      }, timeout);
-      
-      // Clear timeout if main promise resolves first
-      promise.finally(() => clearTimeout(timeoutId));
-    });
-
-    try {
-      // Race between main promise and timeout
-      const result = await Promise.race([promise, timeoutPromise]);
-      return result;
-    } catch (error) {
-      // Handle graceful degradation
-      if (fallbackOptions.fallbackFunction && typeof fallbackOptions.fallbackFunction === 'function') {
-        try {
-          logMessage('warn', `Using fallback function due to error`, {
-            error: error.message,
-            fallbackEnabled: true
-          });
-          
-          return await fallbackOptions.fallbackFunction(error);
-        } catch (fallbackError) {
-          logMessage('error', `Fallback function also failed`, {
-            originalError: error.message,
-            fallbackError: fallbackError.message
-          });
-          throw fallbackError;
-        }
-      }
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Circuit breaker implementation for external service calls
-   */
-  function createCircuitBreaker(options = {}) {
-    const config = {
-      failureThreshold: options.failureThreshold || 5,
-      resetTimeout: options.resetTimeout || 30000,
-      monitoringPeriod: options.monitoringPeriod || 60000,
-      ...options
-    };
-
-    let state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
-    let failures = 0;
-    let lastFailureTime = null;
-    let successes = 0;
-
-    return {
-      async execute(fn, fallbackFn = null) {
-        if (state === 'OPEN') {
-          if (Date.now() - lastFailureTime > config.resetTimeout) {
-            state = 'HALF_OPEN';
-            successes = 0;
-          } else {
-            if (fallbackFn) {
-              return await fallbackFn();
-            }
-            throw new Error('Circuit breaker is OPEN');
-          }
-        }
-
-        try {
-          const result = await fn();
-          
-          if (state === 'HALF_OPEN') {
-            successes++;
-            if (successes >= 3) { // Require 3 successes to close
-              state = 'CLOSED';
-              failures = 0;
-            }
-          } else {
-            failures = 0; // Reset failures on success
-          }
-          
-          return result;
-        } catch (error) {
-          failures++;
-          lastFailureTime = Date.now();
-          
-          if (failures >= config.failureThreshold) {
-            state = 'OPEN';
-            logMessage('warn', `Circuit breaker opened`, {
-              failures,
-              threshold: config.failureThreshold
-            });
-          }
-          
-          if (fallbackFn && state === 'OPEN') {
-            return await fallbackFn();
-          }
-          
-          throw error;
-        }
+const DEFAULT_CONFIG = {
+  // Redis configuration
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+    db: process.env.REDIS_DB || 0,
+    maxRetriesPerRequest: 3,
+    retryDelayOnFailover: 100,
+    lazyConnect: true
+  },
+  
+  // Queue configuration
+  queue: {
+    defaultJobOptions: {
+      removeOnComplete: 100,  // Keep last 100 completed jobs
+      removeOnFail: 50,       // Keep last 50 failed jobs
+      attempts: 3,            // Maximum retry attempts
+      backoff: {
+        type: 'exponential',
+        delay: 1000,          // Base delay in milliseconds
+        multiplier: 2,        // Exponential multiplier
+        maxDelay: 30000       // Maximum delay cap
       },
-      
-      getState: () => ({ state, failures, successes }),
-      reset: () => {
-        state = 'CLOSED';
-        failures = 0;
-        successes = 0;
-        lastFailureTime = null;
-      }
+      delay: 0,               // Initial delay
+      priority: 0             // Job priority (higher = more priority)
+    }
+  },
+  
+  // Worker configuration
+  worker: {
+    concurrency: 3,           // Number of concurrent jobs
+    maxStalledCount: 1,       // Max times a job can be stalled
+    stalledInterval: 30000,   // Check for stalled jobs every 30s
+    removeOnComplete: 100,
+    removeOnFail: 50
+  },
+  
+  // Dead Letter Queue configuration
+  dlq: {
+    enabled: true,
+    maxRetries: 3,
+    retentionDays: 7
+  },
+  
+  // Health check configuration
+  healthCheck: {
+    enabled: true,
+    interval: 10000,          // Health check every 10 seconds
+    thresholds: {
+      waiting: 1000,          // Alert if waiting jobs > 1000
+      active: 50,             // Alert if active jobs > 50
+      failed: 100             // Alert if failed jobs > 100
+    }
+  }
+};
+
+/**
+ * Enhanced job processor with error handling and logging
+ */
+class JobProcessor {
+  constructor(name, processFn, options = {}) {
+    this.name = name;
+    this.processFn = processFn;
+    this.options = options;
+    this.stats = {
+      processed: 0,
+      failed: 0,
+      errors: new Map()
     };
   }
 
   /**
-   * Initialize Redis connections
+   * Process a job with comprehensive error handling
    */
-  async function initializeRedis() {
-    try {
-      redis = new Redis(workerConfig.redis);
-      redisSubscriber = new Redis(workerConfig.redis);
-
-      // Setup Redis event handlers
-      setupRedisEventHandlers(redis, 'main');
-      setupRedisEventHandlers(redisSubscriber, 'subscriber');
-
-      await Promise.all([
-        redis.ping(),
-        redisSubscriber.ping()
-      ]);
-
-      logMessage('info', 'Redis connections initialized');
-    } catch (error) {
-      logMessage('error', 'Failed to initialize Redis', { error: error.message });
-      throw error;
-    }
-  }
-
-  /**
-   * Setup Redis connection event handlers
-   */
-  function setupRedisEventHandlers(redisClient, clientType) {
-    redisClient.on('connect', () => {
-      logMessage('info', `Redis ${clientType} connection established`);
-    });
-
-    redisClient.on('error', (err) => {
-      logMessage('error', `Redis ${clientType} error`, { error: err.message });
-    });
-
-    redisClient.on('ready', () => {
-      logMessage('info', `Redis ${clientType} ready`);
-    });
-  }
-
-  /**
-   * Register a job handler
-   * @param {string} jobType - Type of job
-   * @param {function} handler - Handler function
-   */
-  function registerHandler(jobType, handler) {
-    if (typeof handler !== 'function') {
-      throw new Error('Handler must be a function');
-    }
-
-    jobHandlers.set(jobType, handler);
-    logMessage('info', `Registered handler for job type: ${jobType}`);
-  }
-
-  /**
-   * Add job to queue
-   * @param {string} type - Job type
-   * @param {object} data - Job data
-   * @param {object} options - Job options
-   */
-  async function addJob(type, data, options = {}) {
-    const job = {
-      id: options.id || `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type,
-      data,
-      priority: options.priority || 0,
-      delay: options.delay || 0,
-      maxRetries: options.maxRetries || workerConfig.queue.maxRetries,
-      createdAt: new Date().toISOString(),
-      attempts: 0
-    };
-
-    if (job.delay > 0) {
-      // Schedule job for later
-      const executeAt = Date.now() + job.delay;
-      await redis.zadd(`${queues.main}:delayed`, executeAt, JSON.stringify(job));
-    } else {
-      // Add job immediately
-      await redis.lpush(queues.main, JSON.stringify(job));
-    }
-
-    logMessage('info', `Job added to queue`, { jobId: job.id, type, delay: job.delay });
-    return job.id;
-  }
-
-  /**
-   * Process delayed jobs and retry jobs (move them to main queue when ready)
-   */
-  async function processDelayedJobs() {
-    const now = Date.now();
-    
-    // Process delayed jobs
-    const delayedJobs = await redis.zrangebyscore(
-      `${queues.main}:delayed`,
-      0,
-      now,
-      'LIMIT',
-      0,
-      100
-    );
-
-    // Process retry jobs
-    const retryJobs = await redis.zrangebyscore(
-      `${queues.main}:retry`,
-      0,
-      now,
-      'LIMIT',
-      0,
-      100
-    );
-
-    const allReadyJobs = [...delayedJobs, ...retryJobs];
-
-    if (allReadyJobs.length > 0) {
-      const pipeline = redis.pipeline();
-      
-      delayedJobs.forEach(jobData => {
-        pipeline.lpush(queues.main, jobData);
-        pipeline.zrem(`${queues.main}:delayed`, jobData);
-      });
-
-      retryJobs.forEach(jobData => {
-        pipeline.lpush(queues.main, jobData);
-        pipeline.zrem(`${queues.main}:retry`, jobData);
-      });
-
-      await pipeline.exec();
-      
-      logMessage('info', `Moved ready jobs to main queue`, {
-        delayed: delayedJobs.length,
-        retry: retryJobs.length
-      });
-    }
-  }
-
-  /**
-   * Main worker function that processes jobs
-   * @param {number} workerId - Worker identifier
-   */
-  async function workerProcess(workerId) {
-    logMessage('info', `Worker ${workerId} started`);
-
-    while (isRunning && !isShuttingDown) {
-      try {
-        // Check for delayed jobs first
-        await processDelayedJobs();
-
-        // Get next job from queue (blocking operation)
-        const result = await redisSubscriber.brpoplpush(
-          queues.main,
-          queues.processing,
-          Math.floor(workerConfig.queue.pollInterval / 1000)
-        );
-
-        if (result) {
-          await handleJob(result, workerId);
-        }
-
-      } catch (error) {
-        if (error.message.includes('Connection is closed')) {
-          logMessage('warn', `Worker ${workerId} connection closed, retrying...`);
-          await sleep(1000);
-          continue;
-        }
-
-        logMessage('error', `Worker ${workerId} error`, { error: error.message });
-        await sleep(1000);
-      }
-    }
-
-    logMessage('info', `Worker ${workerId} stopped`);
-  }
-
-  /**
-   * Handle individual job processing
-   * @param {string} jobData - Serialized job data
-   * @param {number} workerId - Worker ID
-   */
-  async function handleJob(jobData, workerId) {
-    let job = null;
+  async process(job) {
     const startTime = Date.now();
-
+    
     try {
-      // Parse and validate job
-      job = JSON.parse(jobData);
+      console.log(`Processing job ${job.id} of type ${this.name}`, {
+        data: job.data,
+        attempts: job.attemptsMade + 1,
+        maxAttempts: job.opts.attempts
+      });
+
+      // Execute the actual job processing
+      const result = await this.processFn(job);
       
-      if (!isValidJob(job)) {
-        throw new Error('Invalid job structure');
-      }
-
-      // Get handler
-      const handler = jobHandlers.get(job.type);
-      if (!handler) {
-        throw new Error(`No handler for job type: ${job.type}`);
-      }
-
-      logMessage('info', `Processing job`, {
-        jobId: job.id,
-        type: job.type,
-        workerId,
-        attempt: job.attempts + 1
-      });
-
-      // Track active job
-      activeJobs.set(job.id, {
-        job,
-        workerId,
-        startTime
-      });
-
-      // Execute job with timeout and graceful degradation
-      const result = await executeWithTimeout(
-        handler(job.data, job),
-        workerConfig.queue.jobTimeout,
-        {
-          fallbackFunction: job.fallbackHandler ? 
-            () => job.fallbackHandler(job.data, job) : 
-            null
-        }
-      );
-
-      // Job succeeded
-      await handleJobSuccess(job, result, startTime);
-      stats.processed++;
-
-      eventEmitter.emit('job:completed', { job, result });
-
+      const duration = Date.now() - startTime;
+      this.stats.processed++;
+      
+      console.log(`Job ${job.id} completed successfully in ${duration}ms`);
+      
+      return result;
+      
     } catch (error) {
-      // Job failed
-      await handleJobFailure(job, error, workerId);
-      stats.failed++;
-
-      eventEmitter.emit('job:failed', { job, error });
-
-    } finally {
-      // Cleanup
-      if (job?.id) {
-        activeJobs.delete(job.id);
-        await redis.lrem(queues.processing, 1, jobData);
-      }
-    }
-  }
-
-  /**
-   * Validate job structure
-   * @param {object} job - Job object
-   * @returns {boolean} Is valid
-   */
-  function isValidJob(job) {
-    return job && 
-           typeof job.id === 'string' && 
-           typeof job.type === 'string' && 
-           job.data !== undefined;
-  }
-
-  /**
-   * Execute function with timeout
-   * @param {Promise} promise - Promise to execute
-   * @param {number} timeout - Timeout in milliseconds
-   */
-  function executeWithTimeout(promise, timeout) {
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Job timed out after ${timeout}ms`));
-      }, timeout);
-
-      promise
-        .then(resolve)
-        .catch(reject)
-        .finally(() => clearTimeout(timeoutId));
-    });
-  }
-
-  /**
-   * Handle successful job completion
-   * @param {object} job - Job object
-   * @param {*} result - Job result
-   * @param {number} startTime - Job start time
-   */
-  async function handleJobSuccess(job, result, startTime) {
-    const completedJob = {
-      ...job,
-      result,
-      completedAt: new Date().toISOString(),
-      processingTime: Date.now() - startTime
-    };
-
-    // Store completed job with TTL
-    await redis.setex(
-      `${queues.completed}:${job.id}`,
-      86400, // 24 hours
-      JSON.stringify(completedJob)
-    );
-
-    logMessage('info', `Job completed`, {
-      jobId: job.id,
-      processingTime: completedJob.processingTime
-    });
-  }
-
-  /**
-   * Handle job failure and retry logic with enhanced error classification
-   * @param {object} job - Job object
-   * @param {Error} error - Error that occurred
-   * @param {number} workerId - Worker ID
-   */
-  async function handleJobFailure(job, error, workerId) {
-    const attempts = (job.attempts || 0) + 1;
-    const maxRetries = job.maxRetries || workerConfig.queue.maxRetries;
-
-    // Classify error type for better handling
-    const errorType = classifyError(error);
-    const isRetryable = shouldRetryError(error, errorType);
-
-    const failedJob = {
-      ...job,
-      attempts,
-      lastError: {
-        message: error.message,
-        type: errorType,
-        code: error.code,
+      const duration = Date.now() - startTime;
+      this.stats.failed++;
+      
+      // Track error types
+      const errorType = error.constructor.name;
+      this.stats.errors.set(errorType, (this.stats.errors.get(errorType) || 0) + 1);
+      
+      console.error(`Job ${job.id} failed after ${duration}ms:`, {
+        error: error.message,
         stack: error.stack,
-        timestamp: new Date().toISOString(),
-        workerId,
-        isRetryable
-      },
-      errors: [...(job.errors || []), {
-        message: error.message,
-        type: errorType,
-        code: error.code,
-        timestamp: new Date().toISOString(),
-        workerId
-      }]
-    };
-
-    logMessage('error', `Job failed`, {
-      jobId: job.id,
-      error: error.message,
-      errorType,
-      attempt: attempts,
-      maxRetries,
-      isRetryable
-    });
-
-    // Handle non-retryable errors immediately
-    if (!isRetryable) {
-      await moveToDeadLetterQueue(failedJob, 'non_retryable_error');
-      eventEmitter.emit('job:dead_letter', { job: failedJob, reason: 'non_retryable_error' });
-      return;
-    }
-
-    if (attempts <= maxRetries) {
-      // Retry with exponential backoff and jitter
-      const delay = calculateRetryDelay(attempts, errorType);
-      
-      // Use Redis for reliable delayed retry instead of setTimeout
-      const retryAt = Date.now() + delay;
-      await redis.zadd(`${queues.main}:retry`, retryAt, JSON.stringify(failedJob));
-      
-      stats.retried++;
-      logMessage('info', `Job scheduled for retry`, {
-        jobId: job.id,
-        delay,
-        attempt: attempts,
-        retryAt: new Date(retryAt).toISOString()
+        attempts: job.attemptsMade + 1,
+        maxAttempts: job.opts.attempts,
+        data: job.data
       });
-
-      eventEmitter.emit('job:retry', { job: failedJob, delay, attempt: attempts });
-    } else {
-      // Move to dead letter queue after max retries
-      await moveToDeadLetterQueue(failedJob, 'max_retries_exceeded');
-      eventEmitter.emit('job:dead_letter', { job: failedJob, reason: 'max_retries_exceeded' });
+      
+      // Re-throw to let BullMQ handle retries
+      throw error;
     }
   }
 
   /**
-   * Calculate retry delay with exponential backoff and error-specific strategies
-   * @param {number} attempt - Attempt number
-   * @param {string} errorType - Type of error for adaptive delays
-   * @returns {number} Delay in milliseconds
+   * Get processor statistics
    */
-  function calculateRetryDelay(attempt, errorType = 'unknown') {
-    const baseDelay = workerConfig.queue.retryDelay;
-    let multiplier = 1;
-
-    // Adjust multiplier based on error type
-    switch (errorType) {
-      case 'rate_limit':
-        multiplier = 3; // Longer delays for rate limiting
-        break;
-      case 'network':
-        multiplier = 2; // Moderate delays for network issues
-        break;
-      case 'timeout':
-        multiplier = 1.5; // Slightly longer for timeouts
-        break;
-      case 'service_unavailable':
-        multiplier = 2.5; // Longer delays for service issues
-        break;
-      default:
-        multiplier = 1;
-    }
-
-    const exponentialDelay = Math.pow(2, attempt - 1) * baseDelay * multiplier;
-    const jitter = Math.random() * 1000; // Add jitter to prevent thundering herd
-    const maxDelay = errorType === 'rate_limit' ? 300000 : 60000; // 5 min for rate limit, 1 min for others
-    
-    return Math.min(exponentialDelay + jitter, maxDelay);
-  }
-
-  /**
-   * Start the worker
-   */
-  async function start() {
-    if (isRunning) {
-      logMessage('warn', 'Worker already running');
-      return;
-    }
-
-    logMessage('info', 'Starting worker', {
-      concurrency: workerConfig.queue.concurrency,
-      queueName: workerConfig.queue.name
-    });
-
-    await initializeRedis();
-    setupGracefulShutdown();
-
-    isRunning = true;
-    stats.startTime = Date.now();
-
-    // Start worker processes
-    workerPromises = [];
-    for (let i = 0; i < workerConfig.queue.concurrency; i++) {
-      workerPromises.push(workerProcess(i));
-    }
-
-    await Promise.all(workerPromises);
-  }
-
-  /**
-   * Stop the worker gracefully
-   */
-  async function stop() {
-    if (!isRunning || isShuttingDown) {
-      return;
-    }
-
-    logMessage('info', 'Stopping worker gracefully');
-    isShuttingDown = true;
-    isRunning = false;
-
-    // Wait for active jobs with timeout
-    const shutdownStart = Date.now();
-    while (activeJobs.size > 0 && 
-           (Date.now() - shutdownStart) < workerConfig.queue.shutdownTimeout) {
-      logMessage('info', `Waiting for ${activeJobs.size} active jobs`);
-      await sleep(1000);
-    }
-
-    // Close Redis connections
-    if (redis) await redis.quit();
-    if (redisSubscriber) await redisSubscriber.quit();
-
-    logMessage('info', 'Worker stopped', { stats: getStats() });
-  }
-
-  /**
-   * Setup graceful shutdown handlers
-   */
-  function setupGracefulShutdown() {
-    const signals = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
-    
-    signals.forEach(signal => {
-      process.on(signal, async () => {
-        logMessage('info', `Received ${signal}, shutting down`);
-        await stop();
-        process.exit(0);
-      });
-    });
-  }
-
-  /**
-   * Get worker statistics
-   * @returns {object} Statistics
-   */
-  function getStats() {
+  getStats() {
     return {
-      ...stats,
-      activeJobs: activeJobs.size,
-      uptime: stats.startTime ? Date.now() - stats.startTime : 0,
-      isRunning,
-      isShuttingDown,
-      registeredHandlers: jobHandlers.size
+      ...this.stats,
+      errors: Object.fromEntries(this.stats.errors)
+    };
+  }
+}
+
+/**
+ * Dead Letter Queue implementation using BullMQ
+ */
+class DeadLetterQueue extends EventEmitter {
+  constructor(name, config = {}) {
+    super();
+    this.name = `${name}-dlq`;
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    
+    // Create Redis connection
+    this.redis = new IORedis(this.config.redis);
+    
+    // Create DLQ queue
+    this.queue = new Queue(this.name, {
+      connection: this.redis,
+      defaultJobOptions: {
+        removeOnComplete: false,  // Keep all DLQ jobs
+        removeOnFail: false,      // Keep all failed DLQ jobs
+        attempts: 1               // Don't retry DLQ jobs
+      }
+    });
+    
+    // Setup queue events
+    this.events = new QueueEvents(this.name, { connection: this.redis });
+    this.setupEventHandlers();
+  }
+
+  /**
+   * Setup event handlers for DLQ
+   */
+  setupEventHandlers() {
+    this.events.on('completed', (job) => {
+      this.emit('job-requeued', job);
+    });
+
+    this.events.on('failed', (job, err) => {
+      console.error(`DLQ job ${job.jobId} failed:`, err);
+    });
+  }
+
+  /**
+   * Add a job to the dead letter queue
+   */
+  async addJob(originalJob, finalError) {
+    const dlqData = {
+      originalJobId: originalJob.id,
+      originalQueue: originalJob.queueName,
+      originalData: originalJob.data,
+      finalError: {
+        message: finalError.message,
+        stack: finalError.stack,
+        name: finalError.name
+      },
+      attempts: originalJob.attemptsMade,
+      failedAt: new Date().toISOString(),
+      metadata: {
+        createdAt: originalJob.timestamp,
+        processedAt: originalJob.processedOn,
+        finishedAt: originalJob.finishedOn
+      }
+    };
+
+    const dlqJob = await this.queue.add('dead-letter-job', dlqData, {
+      priority: originalJob.opts.priority || 0
+    });
+
+    this.emit('job-added', dlqJob, originalJob);
+    console.log(`Job ${originalJob.id} moved to dead letter queue: ${dlqJob.id}`);
+    
+    return dlqJob;
+  }
+
+  /**
+   * Requeue a job from DLQ back to original queue
+   */
+  async requeueJob(dlqJobId, targetQueue) {
+    const dlqJob = await this.queue.getJob(dlqJobId);
+    
+    if (!dlqJob) {
+      throw new Error(`DLQ job ${dlqJobId} not found`);
+    }
+
+    const originalData = dlqJob.data.originalData;
+    const newJob = await targetQueue.add('requeued-job', originalData, {
+      priority: dlqJob.opts.priority || 0
+    });
+
+    // Remove from DLQ
+    await dlqJob.remove();
+    
+    this.emit('job-requeued', newJob, dlqJob);
+    console.log(`Job ${dlqJobId} requeued as ${newJob.id}`);
+    
+    return newJob;
+  }
+
+  /**
+   * Get DLQ statistics
+   */
+  async getStats() {
+    const waiting = await this.queue.getWaiting();
+    const completed = await this.queue.getCompleted();
+    const failed = await this.queue.getFailed();
+
+    return {
+      waiting: waiting.length,
+      completed: completed.length,
+      failed: failed.length,
+      total: waiting.length + completed.length + failed.length
     };
   }
 
   /**
-   * Get queue information
-   * @returns {object} Queue info
+   * Get all DLQ jobs
    */
-  async function getQueueInfo() {
-    const [waiting, processing, failed, delayed] = await Promise.all([
-      redis.llen(queues.main),
-      redis.llen(queues.processing),
-      redis.llen(queues.failed),
-      redis.zcard(`${queues.main}:delayed`)
+  async getAllJobs() {
+    const [waiting, completed, failed] = await Promise.all([
+      this.queue.getWaiting(),
+      this.queue.getCompleted(),
+      this.queue.getFailed()
     ]);
 
     return {
       waiting,
-      processing,
+      completed,
       failed,
-      delayed
+      all: [...waiting, ...completed, ...failed]
     };
   }
 
   /**
-   * Utility functions
+   * Clean up old DLQ jobs
    */
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  function logMessage(level, message, meta = {}) {
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      worker: workerConfig.queue.name,
-      ...meta
-    };
-    console.log(JSON.stringify(logEntry));
-  }
-
-  // Return public API
-  return {
-    // Core methods
-    start,
-    stop,
-    registerHandler,
-    addJob,
-
-    // Information methods
-    getStats,
-    getQueueInfo,
+  async cleanup(olderThanDays = 7) {
+    const cutoff = Date.now() - (olderThanDays * 24 * 60 * 60 * 1000);
     
-    // Event handling
-    on: eventEmitter.on.bind(eventEmitter),
-    off: eventEmitter.off.bind(eventEmitter),
-    emit: eventEmitter.emit.bind(eventEmitter),
+    await this.queue.clean(cutoff, 1000, 'completed');
+    await this.queue.clean(cutoff, 1000, 'failed');
+    
+    console.log(`DLQ cleanup completed for jobs older than ${olderThanDays} days`);
+  }
 
-    // Utility
-    isRunning: () => isRunning,
-    isShuttingDown: () => isShuttingDown
-  };
+  /**
+   * Close DLQ connections
+   */
+  async close() {
+    await this.queue.close();
+    await this.events.close();
+    this.redis.disconnect();
+  }
 }
 
-// Example usage
-async function exampleUsage() {
-  // Create worker instance
-  const worker = createJobWorker({
-    queueName: 'example_queue',
-    concurrency: 3,
-    maxRetries: 2
-  });
+/**
+ * Enhanced Queue Manager with BullMQ
+ */
+class QueueManager extends EventEmitter {
+  constructor(config = {}) {
+    super();
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.queues = new Map();
+    this.workers = new Map();
+    this.processors = new Map();
+    this.dlqs = new Map();
+    this.queueEvents = new Map();
+    this.healthCheckInterval = null;
+    
+    // Create Redis connection
+    this.redis = new IORedis(this.config.redis);
+    
+    // Setup health monitoring
+    if (this.config.healthCheck.enabled) {
+      this.startHealthCheck();
+    }
+  }
 
-  // Register handlers
-  worker.registerHandler('email', async (data) => {
-    console.log(`Sending email to ${data.email}`);
+  /**
+   * Create a new queue with worker and DLQ
+   */
+  async createQueue(name, processor, options = {}) {
+    if (this.queues.has(name)) {
+      throw new Error(`Queue ${name} already exists`);
+    }
+
+    const queueConfig = { ...this.config.queue, ...options.queue };
+    const workerConfig = { ...this.config.worker, ...options.worker };
+
+    // Create main queue
+    const queue = new Queue(name, {
+      connection: this.redis,
+      defaultJobOptions: queueConfig.defaultJobOptions
+    });
+
+    // Create job processor
+    const jobProcessor = new JobProcessor(name, processor, options);
+    
+    // Create worker
+    const worker = new BullMQWorker(name, 
+      async (job) => await jobProcessor.process(job),
+      {
+        connection: this.redis,
+        concurrency: workerConfig.concurrency,
+        maxStalledCount: workerConfig.maxStalledCount,
+        stalledInterval: workerConfig.stalledInterval,
+        removeOnComplete: workerConfig.removeOnComplete,
+        removeOnFail: workerConfig.removeOnFail
+      }
+    );
+
+    // Create dead letter queue
+    const dlq = new DeadLetterQueue(name, this.config);
+
+    // Create queue events
+    const queueEvents = new QueueEvents(name, { connection: this.redis });
+
+    // Setup event handlers
+    this.setupQueueEventHandlers(name, queue, worker, dlq, queueEvents);
+
+    // Store references
+    this.queues.set(name, queue);
+    this.workers.set(name, worker);
+    this.processors.set(name, jobProcessor);
+    this.dlqs.set(name, dlq);
+    this.queueEvents.set(name, queueEvents);
+
+    console.log(`Queue ${name} created with ${workerConfig.concurrency} workers`);
+    
+    return {
+      queue,
+      worker,
+      dlq,
+      processor: jobProcessor
+    };
+  }
+
+  /**
+   * Setup event handlers for queue, worker, and DLQ
+   */
+  setupQueueEventHandlers(name, queue, worker, dlq, queueEvents) {
+    // Worker events
+    worker.on('completed', (job, result) => {
+      this.emit('job-completed', { queueName: name, job, result });
+    });
+
+    worker.on('failed', async (job, err) => {
+      this.emit('job-failed', { queueName: name, job, error: err });
+      
+      // Check if job should go to DLQ
+      if (job.attemptsMade >= job.opts.attempts) {
+        await dlq.addJob(job, err);
+        this.emit('job-moved-to-dlq', { queueName: name, job, error: err });
+      }
+    });
+
+    worker.on('stalled', (jobId) => {
+      console.warn(`Job ${jobId} stalled in queue ${name}`);
+      this.emit('job-stalled', { queueName: name, jobId });
+    });
+
+    // Queue events
+    queueEvents.on('waiting', (job) => {
+      this.emit('job-waiting', { queueName: name, job });
+    });
+
+    queueEvents.on('active', (job) => {
+      this.emit('job-active', { queueName: name, job });
+    });
+
+    queueEvents.on('progress', (job, progress) => {
+      this.emit('job-progress', { queueName: name, job, progress });
+    });
+
+    // DLQ events
+    dlq.on('job-added', (dlqJob, originalJob) => {
+      this.emit('dlq-job-added', { queueName: name, dlqJob, originalJob });
+    });
+
+    dlq.on('job-requeued', (newJob, dlqJob) => {
+      this.emit('dlq-job-requeued', { queueName: name, newJob, dlqJob });
+    });
+  }
+
+  /**
+   * Add a job to a specific queue
+   */
+  async addJob(queueName, jobType, data, options = {}) {
+    const queue = this.queues.get(queueName);
+    if (!queue) {
+      throw new Error(`Queue ${queueName} not found`);
+    }
+
+    const job = await queue.add(jobType, data, options);
+    this.emit('job-added', { queueName, job });
+    
+    return job;
+  }
+
+  /**
+   * Get a specific queue
+   */
+  getQueue(name) {
+    return this.queues.get(name);
+  }
+
+  /**
+   * Get a specific worker
+   */
+  getWorker(name) {
+    return this.workers.get(name);
+  }
+
+  /**
+   * Get a specific DLQ
+   */
+  getDLQ(name) {
+    return this.dlqs.get(name);
+  }
+
+  /**
+   * Get comprehensive statistics for all queues
+   */
+  async getStats() {
+    const stats = {
+      queues: {},
+      overall: {
+        totalQueues: this.queues.size,
+        totalJobs: 0,
+        totalWaiting: 0,
+        totalActive: 0,
+        totalCompleted: 0,
+        totalFailed: 0,
+        totalDLQ: 0
+      }
+    };
+
+    for (const [name, queue] of this.queues) {
+      const [waiting, active, completed, failed] = await Promise.all([
+        queue.getWaiting(),
+        queue.getActive(),
+        queue.getCompleted(),
+        queue.getFailed()
+      ]);
+
+      const dlqStats = await this.dlqs.get(name).getStats();
+      const processorStats = this.processors.get(name).getStats();
+
+      const queueStats = {
+        waiting: waiting.length,
+        active: active.length,
+        completed: completed.length,
+        failed: failed.length,
+        dlq: dlqStats,
+        processor: processorStats
+      };
+
+      stats.queues[name] = queueStats;
+      stats.overall.totalJobs += queueStats.waiting + queueStats.active + queueStats.completed + queueStats.failed;
+      stats.overall.totalWaiting += queueStats.waiting;
+      stats.overall.totalActive += queueStats.active;
+      stats.overall.totalCompleted += queueStats.completed;
+      stats.overall.totalFailed += queueStats.failed;
+      stats.overall.totalDLQ += dlqStats.total;
+    }
+
+    return stats;
+  }
+
+  /**
+   * Start health check monitoring
+   */
+  startHealthCheck() {
+    this.healthCheckInterval = setInterval(async () => {
+      try {
+        const health = await this.getHealth();
+        this.emit('health-check', health);
+        
+        if (health.status === 'unhealthy') {
+          console.warn('Queue system health check failed:', health.issues);
+        }
+      } catch (error) {
+        console.error('Health check error:', error);
+      }
+    }, this.config.healthCheck.interval);
+  }
+
+  /**
+   * Get system health status
+   */
+  async getHealth() {
+    const stats = await this.getStats();
+    const issues = [];
+    const thresholds = this.config.healthCheck.thresholds;
+
+    // Check Redis connection
+    try {
+      await this.redis.ping();
+    } catch (error) {
+      issues.push(`Redis connection failed: ${error.message}`);
+    }
+
+    // Check queue thresholds
+    for (const [name, queueStats] of Object.entries(stats.queues)) {
+      if (queueStats.waiting > thresholds.waiting) {
+        issues.push(`Queue ${name} has ${queueStats.waiting} waiting jobs (threshold: ${thresholds.waiting})`);
+      }
+      
+      if (queueStats.active > thresholds.active) {
+        issues.push(`Queue ${name} has ${queueStats.active} active jobs (threshold: ${thresholds.active})`);
+      }
+      
+      if (queueStats.failed > thresholds.failed) {
+        issues.push(`Queue ${name} has ${queueStats.failed} failed jobs (threshold: ${thresholds.failed})`);
+      }
+    }
+
+    return {
+      status: issues.length === 0 ? 'healthy' : 'unhealthy',
+      issues,
+      stats,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Pause all queues
+   */
+  async pauseAll() {
+    const pausePromises = Array.from(this.queues.values()).map(queue => queue.pause());
+    await Promise.all(pausePromises);
+    console.log('All queues paused');
+  }
+
+  /**
+   * Resume all queues
+   */
+  async resumeAll() {
+    const resumePromises = Array.from(this.queues.values()).map(queue => queue.resume());
+    await Promise.all(resumePromises);
+    console.log('All queues resumed');
+  }
+
+  /**
+   * Gracefully shutdown all queues and workers
+   */
+  async shutdown() {
+    console.log('Shutting down queue system...');
+    
+    // Stop health check
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    // Close workers
+    const workerClosePromises = Array.from(this.workers.values()).map(worker => worker.close());
+    await Promise.all(workerClosePromises);
+
+    // Close queues
+    const queueClosePromises = Array.from(this.queues.values()).map(queue => queue.close());
+    await Promise.all(queueClosePromises);
+
+    // Close queue events
+    const eventClosePromises = Array.from(this.queueEvents.values()).map(events => events.close());
+    await Promise.all(eventClosePromises);
+
+    // Close DLQs
+    const dlqClosePromises = Array.from(this.dlqs.values()).map(dlq => dlq.close());
+    await Promise.all(dlqClosePromises);
+
+    // Close Redis connection
+    this.redis.disconnect();
+
+    console.log('Queue system shutdown complete');
+  }
+}
+
+/**
+ * Example usage and job processors
+ */
+class ExampleJobProcessors {
+  /**
+   * Email sending job processor
+   */
+  static async processEmailJob(job) {
+    const { to, subject, body, template } = job.data;
+    
+    // Simulate email sending
     await new Promise(resolve => setTimeout(resolve, 1000));
-    return { sent: true, messageId: `msg_${Date.now()}` };
-  });
+    
+    // Simulate occasional failures
+    if (Math.random() < 0.2) {
+      throw new Error('Email service temporarily unavailable');
+    }
+    
+    // Update job progress
+    job.updateProgress(50);
+    
+    // More processing...
+    await new Promise(resolve => setTimeout(resolve, 500));
+    job.updateProgress(100);
+    
+    return {
+      messageId: `msg_${Date.now()}`,
+      to,
+      subject,
+      sentAt: new Date().toISOString()
+    };
+  }
 
-  worker.registerHandler('image', async (data) => {
-    console.log(`Processing image: ${data.url}`);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    return { processed: true, newUrl: `processed_${data.url}` };
-  });
+  /**
+   * Image processing job processor
+   */
+  static async processImageJob(job) {
+    const { imageUrl, transformations } = job.data;
+    
+    // Simulate image processing
+    for (let i = 0; i < transformations.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      job.updateProgress(((i + 1) / transformations.length) * 100);
+    }
+    
+    return {
+      originalUrl: imageUrl,
+      processedUrl: `${imageUrl}_processed`,
+      transformations,
+      processedAt: new Date().toISOString()
+    };
+  }
 
-  // Event listeners
-  worker.on('job:completed', ({ job, result }) => {
-    console.log(`✅ Job ${job.id} completed:`, result);
-  });
-
-  worker.on('job:failed', ({ job, error }) => {
-    console.log(`❌ Job ${job.id} failed:`, error.message);
-  });
-
-  // Add some jobs
-  await worker.addJob('email', { email: 'user@example.com', subject: 'Hello' });
-  await worker.addJob('image', { url: 'image.jpg' });
-  await worker.addJob('email', { email: 'admin@example.com' }, { delay: 5000 });
-
-  // Start worker
-  await worker.start();
+  /**
+   * Data processing job processor
+   */
+  static async processDataJob(job) {
+    const { dataset, operation } = job.data;
+    
+    // Simulate data processing with progress updates
+    const totalSteps = 10;
+    for (let i = 0; i < totalSteps; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      job.updateProgress((i + 1) / totalSteps * 100);
+    }
+    
+    return {
+      dataset,
+      operation,
+      result: `Processed ${dataset} with ${operation}`,
+      processedAt: new Date().toISOString()
+    };
+  }
 }
 
-// Export factory function
-module.exports = createJobWorker;
+/**
+ * Example usage function
+ */
+async function createExampleUsage() {
+  const queueManager = new QueueManager({
+    redis: {
+      host: 'localhost',
+      port: 6379
+    },
+    healthCheck: {
+      enabled: true,
+      interval: 5000
+    }
+  });
 
-// Run example if executed directly
+  try {
+    // Create queues with different processors
+    const { queue: emailQueue } = await queueManager.createQueue(
+      'email',
+      ExampleJobProcessors.processEmailJob,
+      {
+        worker: { concurrency: 2 },
+        queue: {
+          defaultJobOptions: {
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 2000 }
+          }
+        }
+      }
+    );
+
+    const { queue: imageQueue } = await queueManager.createQueue(
+      'image',
+      ExampleJobProcessors.processImageJob,
+      {
+        worker: { concurrency: 1 },
+        queue: {
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 1000 }
+          }
+        }
+      }
+    );
+
+    // Setup event listeners
+    queueManager.on('job-completed', ({ queueName, job, result }) => {
+      console.log(`✅ Job completed in ${queueName}:`, job.id);
+    });
+
+    queueManager.on('job-failed', ({ queueName, job, error }) => {
+      console.log(`❌ Job failed in ${queueName}:`, job.id, error.message);
+    });
+
+    queueManager.on('job-moved-to-dlq', ({ queueName, job }) => {
+      console.log(`💀 Job moved to DLQ in ${queueName}:`, job.id);
+    });
+
+    queueManager.on('health-check', (health) => {
+      if (health.status === 'unhealthy') {
+        console.warn('🚨 Health check failed:', health.issues);
+      }
+    });
+
+    // Add some jobs
+    await queueManager.addJob('email', 'welcome-email', {
+      to: 'user@example.com',
+      subject: 'Welcome to our service!',
+      template: 'welcome'
+    }, { priority: 1 });
+
+    await queueManager.addJob('email', 'newsletter', {
+      to: 'subscriber@example.com',
+      subject: 'Monthly Newsletter',
+      template: 'newsletter'
+    }, { priority: 2, delay: 5000 });
+
+    await queueManager.addJob('image', 'resize', {
+      imageUrl: 'https://example.com/image.jpg',
+      transformations: ['resize', 'compress', 'watermark']
+    });
+
+    // Monitor stats
+    setInterval(async () => {
+      const stats = await queueManager.getStats();
+      console.log('📊 Queue Stats:', JSON.stringify(stats, null, 2));
+    }, 10000);
+
+    // Graceful shutdown handling
+    process.on('SIGTERM', async () => {
+      console.log('Received SIGTERM, shutting down gracefully...');
+      await queueManager.shutdown();
+      process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+      console.log('Received SIGINT, shutting down gracefully...');
+      await queueManager.shutdown();
+      process.exit(0);
+    });
+
+    console.log('🚀 Queue system started successfully!');
+    
+  } catch (error) {
+    console.error('Failed to start queue system:', error);
+    await queueManager.shutdown();
+  }
+}
+
+// Export classes for use in your application
+module.exports = {
+  QueueManager,
+  DeadLetterQueue,
+  JobProcessor,
+  ExampleJobProcessors,
+  DEFAULT_CONFIG,
+  createExampleUsage
+};
+
+// If running this file directly, run the example
 if (require.main === module) {
-  exampleUsage().catch(console.error);
+  createExampleUsage().catch(console.error);
 }
