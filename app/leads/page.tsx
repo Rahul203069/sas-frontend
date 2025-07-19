@@ -78,7 +78,7 @@ function page() {
   };
 
   const handleImportLeads = () => {
-    router.push('/csv-upload');
+    router.push('/csv-upload/2345454');
   };
 
   return (
@@ -94,6 +94,7 @@ function page() {
             >
               <Upload className="w-4 h-4" />
               Import Leads
+
             </button>
           </div>
         </div>
