@@ -78,7 +78,7 @@ function page() {
   };
 
   const handleImportLeads = () => {
-    router.push('/csv-upload/2345454');
+    router.push('/csv-upload/ssssssd');
   };
 
   return (

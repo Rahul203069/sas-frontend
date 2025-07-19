@@ -276,7 +276,10 @@ function App() {
 
       {/* Chat History Modal */}
       {showChatHistory && selectedAppointment && (
-      <div className="fixed inset-0 backdrop-blur-sm bg-white/10 flex items-center justify-center p-4 z-50 border border-white/20 rounded-xl shadow-lg">
+
+<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+
+ 
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
@@ -315,7 +318,7 @@ function App() {
 
       {/* Preparation Modal */}
       {showPreparation && selectedAppointment && (
-       <div className="fixed inset-0 backdrop-blur-sm bg-white/10 flex items-center justify-center p-4 z-50 border border-white/20 rounded-xl shadow-lg">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
