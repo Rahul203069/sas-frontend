@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useMemo } from 'react';
 import { Search, Calendar, Clock, Phone, Mail, MessageSquare, Video, MapPin, User, Filter, Plus, CheckCircle, XCircle, AlertCircle, Eye, FileText, CalendarDays } from 'lucide-react';
-import { Appointment } from '@/types/appointment';
+import { Appointment } from '@/type/appointment';
 import { generateMockAppointments } from '@/data/mockData';
 import { Pagination } from '@/components/Pagination';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
