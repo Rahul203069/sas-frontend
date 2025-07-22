@@ -83,11 +83,11 @@ export function Select({
                 }`}>
                   {selectedOption?.label || placeholder}
                 </span>
-                {selectedOption?.description && (
+                {/* {selectedOption?.description && (
                   <span className="block text-xs text-gray-400 truncate mt-0.5">
                     {selectedOption.description}
                   </span>
-                )}
+                )} */}
               </div>
               {selectedOption?.color && (
                 <span 
