@@ -4,24 +4,11 @@ import { Search, Calendar, Clock, Phone, Mail, MessageSquare, Video, MapPin, Use
 import { Appointment } from '@/type/appointment';
 import { generateMockAppointments } from '@/data/mockData';
 import { Pagination } from '@/components/Pagination';
-import { DateRangePicker } from '@/components/DateRangePicker';
+import { CalendarDatePicker } from '@/components/CalendarDatePicker';
 import { FilterChip } from '@/components/FilterChip';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
 
 const ITEMS_PER_PAGE = 10;
-
-const DATE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Time' },
-  { value: 'today', label: 'Today' },
-  { value: 'tomorrow', label: 'Tomorrow' },
-  { value: 'this-week', label: 'This Week' },
-  { value: 'next-week', label: 'Next Week' },
-  { value: 'this-month', label: 'This Month' },
-  { value: 'next-month', label: 'Next Month' },
-  { value: 'upcoming', label: 'Upcoming' },
-  { value: 'past', label: 'Past' },
-  { value: 'custom', label: 'Custom Range' }
-];
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Status', color: 'blue' as const },
@@ -31,17 +18,27 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed', color: 'purple' as const }
 ];
 
+const DATE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Dates' },
+  { value: 'today', label: 'Today' },
+  { value: 'tomorrow', label: 'Tomorrow' },
+  { value: 'this-week', label: 'This Week' },
+  { value: 'next-week', label: 'Next Week' },
+  { value: 'this-month', label: 'This Month' },
+  { value: 'custom', label: 'Custom Range' }
+];
+
 function App() {
   const [appointments, setAppointments] = useState<Appointment[]>(() => generateMockAppointments(150));
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showPreparation, setShowPreparation] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const markAsComplete = (appointmentId: string) => {
     setAppointments(prev => 
@@ -53,61 +50,6 @@ function App() {
     );
   };
 
-  const getDateRangeForFilter = (filter: string) => {
-    const today = new Date();
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-    
-    switch (filter) {
-      case 'today':
-        return { start: startOfToday, end: endOfToday };
-      case 'tomorrow':
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const startOfTomorrow = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
-        const endOfTomorrow = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 23, 59, 59);
-        return { start: startOfTomorrow, end: endOfTomorrow };
-      case 'this-week':
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        endOfWeek.setHours(23, 59, 59, 999);
-        return { start: startOfWeek, end: endOfWeek };
-      case 'next-week':
-        const nextWeekStart = new Date(today);
-        nextWeekStart.setDate(today.getDate() + (7 - today.getDay()));
-        nextWeekStart.setHours(0, 0, 0, 0);
-        const nextWeekEnd = new Date(nextWeekStart);
-        nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
-        nextWeekEnd.setHours(23, 59, 59, 999);
-        return { start: nextWeekStart, end: nextWeekEnd };
-      case 'this-month':
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-        return { start: startOfMonth, end: endOfMonth };
-      case 'next-month':
-        const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-        const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0, 23, 59, 59);
-        return { start: nextMonthStart, end: nextMonthEnd };
-      case 'past':
-        return { start: new Date(2020, 0, 1), end: new Date(today.getTime() - 1) };
-      case 'upcoming':
-        return { start: today, end: new Date(2030, 11, 31) };
-      case 'custom':
-        if (customDateRange.start && customDateRange.end) {
-          return {
-            start: new Date(customDateRange.start),
-            end: new Date(customDateRange.end + 'T23:59:59')
-          };
-        }
-        return null;
-      default:
-        return null;
-    }
-  };
-
   const filteredAppointments = useMemo(() => {
     return appointments.filter(appointment => {
       const matchesSearch = appointment.leadName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -117,17 +59,16 @@ function App() {
       const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
       
       let matchesDate = true;
-      if (dateFilter !== 'all') {
-        const dateRange = getDateRangeForFilter(dateFilter);
-        if (dateRange) {
-          const appointmentDate = new Date(appointment.date);
-          matchesDate = appointmentDate >= dateRange.start && appointmentDate <= dateRange.end;
-        }
+      if (dateRange.start && dateRange.end) {
+        const appointmentDate = new Date(appointment.date);
+        const startDate = new Date(dateRange.start);
+        const endDate = new Date(dateRange.end + 'T23:59:59');
+        matchesDate = appointmentDate >= startDate && appointmentDate <= endDate;
       }
       
       return matchesSearch && matchesStatus && matchesDate;
     });
-  }, [appointments, searchTerm, statusFilter, dateFilter, customDateRange]);
+  }, [appointments, searchTerm, statusFilter, dateRange]);
 
   const totalPages = Math.ceil(filteredAppointments.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -136,7 +77,7 @@ function App() {
   // Reset to first page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFilter, customDateRange]);
+  }, [searchTerm, statusFilter, dateRange]);
 
   const openChatHistory = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
@@ -151,8 +92,7 @@ function App() {
   const clearAllFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
-    setDateFilter('all');
-    setCustomDateRange({ start: '', end: '' });
+    setDateRange({ start: '', end: '' });
   };
 
   const getActiveFilters = () => {
@@ -161,20 +101,13 @@ function App() {
       const status = STATUS_OPTIONS.find(s => s.value === statusFilter);
       if (status) filters.push({ type: 'status', label: 'Status', value: status.label, onRemove: () => setStatusFilter('all') });
     }
-    if (dateFilter !== 'all') {
-      const dateOption = DATE_FILTER_OPTIONS.find(d => d.value === dateFilter);
-      if (dateOption) {
-        if (dateFilter === 'custom' && (customDateRange.start || customDateRange.end)) {
-          const dateLabel = customDateRange.start && customDateRange.end
-            ? `${new Date(customDateRange.start).toLocaleDateString()} - ${new Date(customDateRange.end).toLocaleDateString()}`
-            : customDateRange.start 
-              ? `From ${new Date(customDateRange.start).toLocaleDateString()}`
-              : `Until ${new Date(customDateRange.end).toLocaleDateString()}`;
-          filters.push({ type: 'date', label: 'Date', value: dateLabel, onRemove: () => { setDateFilter('all'); setCustomDateRange({ start: '', end: '' }); } });
-        } else {
-          filters.push({ type: 'date', label: 'Date', value: dateOption.label, onRemove: () => setDateFilter('all') });
-        }
-      }
+    if (dateRange.start || dateRange.end) {
+      const dateLabel = dateRange.start && dateRange.end
+        ? `${new Date(dateRange.start).toLocaleDateString()} - ${new Date(dateRange.end).toLocaleDateString()}`
+        : dateRange.start 
+          ? `From ${new Date(dateRange.start).toLocaleDateString()}`
+          : `Until ${new Date(dateRange.end).toLocaleDateString()}`;
+      filters.push({ type: 'date', label: 'Date Range', value: dateLabel, onRemove: () => setDateRange({ start: '', end: '' }) });
     }
     if (searchTerm) {
       filters.push({ type: 'search', label: 'Search', value: `"${searchTerm}"`, onRemove: () => setSearchTerm('') });
@@ -249,7 +182,7 @@ function App() {
 
                 {/* Custom Date Range Picker */}
                 {dateFilter === 'custom' && (
-                  <DateRangePicker
+                  <CalendarDatePicker
                     startDate={customDateRange.start}
                     endDate={customDateRange.end}
                     onChange={(start, end) => setCustomDateRange({ start, end })}
