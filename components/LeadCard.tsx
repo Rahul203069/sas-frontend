@@ -136,7 +136,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onViewChat, onViewSummary, on
                 e.stopPropagation();
                 onViewChat(lead.id);
               }}
-              className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-105"
+              className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all hover:scale-105"
               title="View Chat"
             >
               <MessageCircle className="w-4 h-4" />
@@ -158,7 +158,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onViewChat, onViewSummary, on
                 e.stopPropagation();
                 onBookCall(lead.id);
               }}
-              className="p-2.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-105"
+              className="p-2.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 hover:scale-105"
               title="Book Call"
             >
               <Phone className="w-4 h-4" />
