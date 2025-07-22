@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useMemo } from 'react';
-import { Search, Calendar, Clock, Phone, Mail, MessageSquare, Video, MapPin, User, Filter, Plus, CheckCircle, XCircle, AlertCircle, Eye, FileText } from 'lucide-react';
-import { Appointment } from '@/type/appointment';
+import { Search, Calendar, Clock, Phone, Mail, MessageSquare, Video, MapPin, User, Filter, Plus, CheckCircle, XCircle, AlertCircle, Eye, FileText, CalendarDays } from 'lucide-react';
+import { Appointment } from '@/types/appointment';
 import { generateMockAppointments } from '@/data/mockData';
 import { Pagination } from '@/components/Pagination';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
@@ -12,6 +12,8 @@ function App() {
   const [appointments, setAppointments] = useState<Appointment[]>(() => generateMockAppointments(150));
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showPreparation, setShowPreparation] = useState(false);
@@ -27,6 +29,61 @@ function App() {
     );
   };
 
+  const getDateRangeForFilter = (filter: string) => {
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+    
+    switch (filter) {
+      case 'today':
+        return { start: startOfToday, end: endOfToday };
+      case 'tomorrow':
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const startOfTomorrow = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
+        const endOfTomorrow = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 23, 59, 59);
+        return { start: startOfTomorrow, end: endOfTomorrow };
+      case 'this-week':
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59, 999);
+        return { start: startOfWeek, end: endOfWeek };
+      case 'next-week':
+        const nextWeekStart = new Date(today);
+        nextWeekStart.setDate(today.getDate() + (7 - today.getDay()));
+        nextWeekStart.setHours(0, 0, 0, 0);
+        const nextWeekEnd = new Date(nextWeekStart);
+        nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+        nextWeekEnd.setHours(23, 59, 59, 999);
+        return { start: nextWeekStart, end: nextWeekEnd };
+      case 'this-month':
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+        return { start: startOfMonth, end: endOfMonth };
+      case 'next-month':
+        const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0, 23, 59, 59);
+        return { start: nextMonthStart, end: nextMonthEnd };
+      case 'past':
+        return { start: new Date(2020, 0, 1), end: new Date(today.getTime() - 1) };
+      case 'upcoming':
+        return { start: today, end: new Date(2030, 11, 31) };
+      case 'custom':
+        if (customDateRange.start && customDateRange.end) {
+          return {
+            start: new Date(customDateRange.start),
+            end: new Date(customDateRange.end + 'T23:59:59')
+          };
+        }
+        return null;
+      default:
+        return null;
+    }
+  };
+
   const filteredAppointments = useMemo(() => {
     return appointments.filter(appointment => {
       const matchesSearch = appointment.leadName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -35,9 +92,18 @@ function App() {
       
       const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
       
-      return matchesSearch && matchesStatus;
+      let matchesDate = true;
+      if (dateFilter !== 'all') {
+        const dateRange = getDateRangeForFilter(dateFilter);
+        if (dateRange) {
+          const appointmentDate = new Date(appointment.date);
+          matchesDate = appointmentDate >= dateRange.start && appointmentDate <= dateRange.end;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesDate;
     });
-  }, [appointments, searchTerm, statusFilter]);
+  }, [appointments, searchTerm, statusFilter, dateFilter, customDateRange]);
 
   const totalPages = Math.ceil(filteredAppointments.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -46,7 +112,7 @@ function App() {
   // Reset to first page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, dateFilter, customDateRange]);
 
   const openChatHistory = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
@@ -80,7 +146,8 @@ function App() {
       <div className="  bg-gray-50  sticky top-0 z-10 ">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="flex flex-col space-y-4">
+              {/* Search Bar */}
               <div className="flex-1 relative max-w-md">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -92,23 +159,70 @@ function App() {
                 />
               </div>
               
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-3">
-                  <Filter className="w-5 h-5 text-gray-400" />
-                  <select 
-                    className="border border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all bg-white"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="all">All Status</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="pending">Pending</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="completed">Completed</option>
-                  </select>
+              {/* Filters Row */}
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Status Filter */}
+                  <div className="flex items-center space-x-3">
+                    <Filter className="w-5 h-5 text-gray-400" />
+                    <select 
+                      className="border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all bg-white"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="pending">Pending</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                  
+                  {/* Date Filter */}
+                  <div className="flex items-center space-x-3">
+                    <CalendarDays className="w-5 h-5 text-gray-400" />
+                    <select 
+                      className="border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all bg-white"
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                    >
+                      <option value="all">All Dates</option>
+                      <option value="today">Today</option>
+                      <option value="tomorrow">Tomorrow</option>
+                      <option value="this-week">This Week</option>
+                      <option value="next-week">Next Week</option>
+                      <option value="this-month">This Month</option>
+                      <option value="next-month">Next Month</option>
+                      <option value="upcoming">Upcoming</option>
+                      <option value="past">Past</option>
+                      <option value="custom">Custom Range</option>
+                    </select>
+                  </div>
+
+                  {/* Custom Date Range */}
+                  {dateFilter === 'custom' && (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="date"
+                        className="border border-gray-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all bg-white text-sm"
+                        value={customDateRange.start}
+                        onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        placeholder="Start date"
+                      />
+                      <span className="text-gray-400 text-sm">to</span>
+                      <input
+                        type="date"
+                        className="border border-gray-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all bg-white text-sm"
+                        value={customDateRange.end}
+                        onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        placeholder="End date"
+                      />
+                    </div>
+                  )}
                 </div>
                 
-                <div className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded-lg">
+                {/* Results Count */}
+                <div className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded-lg whitespace-nowrap">
                   {filteredAppointments.length} of {appointments.length} appointments
                 </div>
               </div>
