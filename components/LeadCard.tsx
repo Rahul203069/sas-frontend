@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MessageCircle, Phone, Calendar, TrendingUp, Eye, FileText, Star, Clock, MoreHorizontal, ExternalLink, Zap, Target, Mail } from 'lucide-react';
-import { Lead } from '../types/lead';
+import { Lead } from '../type/lead';
 
 interface LeadCardProps {
   lead: Lead;
