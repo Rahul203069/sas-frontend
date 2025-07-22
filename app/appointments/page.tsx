@@ -18,23 +18,11 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed', color: 'purple' as const }
 ];
 
-const DATE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Dates' },
-  { value: 'today', label: 'Today' },
-  { value: 'tomorrow', label: 'Tomorrow' },
-  { value: 'this-week', label: 'This Week' },
-  { value: 'next-week', label: 'Next Week' },
-  { value: 'this-month', label: 'This Month' },
-  { value: 'custom', label: 'Custom Range' }
-];
-
 function App() {
   const [appointments, setAppointments] = useState<Appointment[]>(() => generateMockAppointments(150));
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [dateFilter, setDateFilter] = useState<string>('all');
-  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showPreparation, setShowPreparation] = useState(false);
@@ -134,7 +122,7 @@ function App() {
         </header>
 
         {/* Enhanced Filters Section */}
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-10 shadow-sm">
           <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
             {/* Main Filter Bar */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -144,7 +132,7 @@ function App() {
                 <input
                   type="text"
                   placeholder="Search by name, email, or service..."
-                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50 hover:bg-white hover:shadow-sm"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white/90 hover:bg-white hover:shadow-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -155,7 +143,7 @@ function App() {
                 {/* Status Filter */}
                 <div className="relative">
                   <select 
-                    className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-300 cursor-pointer"
+                    className="appearance-none bg-white/90 border border-gray-200 rounded-xl px-4 py-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                   >
@@ -166,35 +154,16 @@ function App() {
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
                 </div>
                 
-                {/* Date Filter */}
-                <div className="relative">
-                  <select 
-                    className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-300 cursor-pointer"
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                  >
-                    {DATE_FILTER_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
-                </div>
-
-                {/* Custom Date Range Picker */}
-                {dateFilter === 'custom' && (
-                  <CalendarDatePicker
-                    startDate={customDateRange.start}
-                    endDate={customDateRange.end}
-                    onChange={(start, end) => setCustomDateRange({ start, end })}
-                    onClear={() => {
-                      setCustomDateRange({ start: '', end: '' });
-                      setDateFilter('all');
-                    }}
-                  />
-                )}
+                {/* Date Range Picker */}
+                <CalendarDatePicker
+                  startDate={dateRange.start}
+                  endDate={dateRange.end}
+                  onChange={(start, end) => setDateRange({ start, end })}
+                  onClear={() => setDateRange({ start: '', end: '' })}
+                />
 
                 {/* Results Count */}
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium border border-blue-200">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 px-4 py-3 rounded-xl text-sm font-medium border border-blue-200 shadow-sm">
                   {filteredAppointments.length} of {appointments.length}
                 </div>
               </div>
@@ -230,7 +199,7 @@ function App() {
 
         {/* Appointments List */}
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
             <div className="divide-y divide-gray-200">
               {paginatedAppointments.map((appointment) => (
                 <div key={appointment.id} className="p-6 hover:bg-gray-50 transition-colors">
@@ -257,14 +226,14 @@ function App() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => openChatHistory(appointment)}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center space-x-2"
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors flex items-center space-x-2"
                       >
                         <Eye className="w-4 h-4" />
                         <span>Chat History</span>
                       </button>
                       <button
                         onClick={() => openPreparation(appointment)}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center space-x-2"
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors flex items-center space-x-2"
                       >
                         <FileText className="w-4 h-4" />
                         <span>Preparation</span>
@@ -275,7 +244,7 @@ function App() {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                     <div className="lg:col-span-2 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl">
                           <Calendar className="w-5 h-5 text-gray-600" />
                           <div>
                             <p className="text-sm text-gray-600">Date</p>
@@ -289,7 +258,7 @@ function App() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl">
                           <Clock className="w-5 h-5 text-gray-600" />
                           <div>
                             <p className="text-sm text-gray-600">Time</p>
@@ -297,7 +266,7 @@ function App() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl">
                           <MapPin className="w-5 h-5 text-gray-600" />
                           <div>
                             <p className="text-sm text-gray-600">Location</p>
@@ -305,7 +274,7 @@ function App() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl">
                           <User className="w-5 h-5 text-gray-600" />
                           <div>
                             <p className="text-sm text-gray-600">Source</p>
@@ -316,7 +285,7 @@ function App() {
                     </div>
                     
                     <div className="space-y-4">
-                      <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="bg-gray-50 rounded-xl p-4">
                         <h4 className="text-sm font-semibold text-gray-900 mb-3">Contact Information</h4>
                         <div className="space-y-3">
                           <div className="flex items-center space-x-3">
@@ -342,7 +311,7 @@ function App() {
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <button 
                         onClick={() => markAsComplete(appointment.id)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center space-x-2"
                       >
                         <CheckCircle className="w-4 h-4" />
                         <span>Mark Complete</span>
@@ -368,7 +337,7 @@ function App() {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No appointments found</h3>
                 <p className="text-gray-600 mb-6">Try adjusting your search criteria or book a new appointment.</p>
-                <button className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                <button className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-medium transition-colors">
                   Book New Appointment
                 </button>
               </div>
