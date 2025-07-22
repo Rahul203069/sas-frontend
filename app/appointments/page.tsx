@@ -12,7 +12,7 @@ const ITEMS_PER_PAGE = 10;
 
 const DATE_FILTER_OPTIONS = [
   { value: 'all', label: 'All Time' },
-  { value: 'today', label: 'Today' },s
+  { value: 'today', label: 'Today' },
   { value: 'tomorrow', label: 'Tomorrow' },
   { value: 'this-week', label: 'This Week' },
   { value: 'next-week', label: 'Next Week' },
