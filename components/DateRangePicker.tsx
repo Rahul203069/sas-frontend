@@ -8,7 +8,7 @@ interface CalendarDatePickerProps {
   onClear: () => void;
 }
 
-export const CalendarDatePicker: React.FC<CalendarDatePickerProps> = ({
+export const DateRangePicker: React.FC<CalendarDatePickerProps> = ({
   startDate,
   endDate,
   onChange,
