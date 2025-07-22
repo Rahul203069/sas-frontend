@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  Bell,
   Bot,
   LogOut,
   Zap
@@ -47,6 +48,12 @@ const navItems = [
     label: 'Appointments', 
     href: '/appointments',
     badge: '3'
+  },
+  {
+    icon: Bell,
+    label: 'Notifications',
+    href: '/notifications',
+    badge: '5' // You can change or make this dynamic
   },
   { 
     icon: Settings, 
