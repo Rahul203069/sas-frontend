@@ -1,21 +1,52 @@
 "use client"
 import React, { useState, useMemo } from 'react';
-import { Search, Calendar, Clock, Phone, Mail, MessageSquare, Video, MapPin, User, Filter, Plus, CheckCircle, XCircle, AlertCircle, Eye, FileText, CalendarDays, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { Search, Calendar, Clock, Phone, Mail, MessageSquare, Video, MapPin, User, Filter, Plus, CheckCircle, XCircle, AlertCircle, Eye, FileText, CalendarDays, ChevronDown, SlidersHorizontal, Circle, Check, CheckCircle2 } from 'lucide-react';
 import { Appointment } from '@/type/appointment';
 import { generateMockAppointments } from '@/data/mockData';
 import { Pagination } from '@/components/Pagination';
 import { CalendarDatePicker } from '@/components/CalendarDatePicker';
 import { FilterChip } from '@/components/FilterChip';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
+import { Select } from '@/components/ui/Select';
 
 const ITEMS_PER_PAGE = 10;
 
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Status', color: 'blue' as const },
-  { value: 'confirmed', label: 'Confirmed', color: 'green' as const },
-  { value: 'pending', label: 'Pending', color: 'orange' as const },
-  { value: 'cancelled', label: 'Cancelled', color: 'red' as const },
-  { value: 'completed', label: 'Completed', color: 'purple' as const }
+  { 
+    value: 'all', 
+    label: 'All Status', 
+    icon: <Circle className="w-4 h-4" />,
+    color: 'bg-blue-400',
+    description: 'Show all items'
+  },
+  { 
+    value: 'confirmed', 
+    label: 'Confirmed', 
+    icon: <Check className="w-4 h-4" />,
+    color: 'bg-green-400',
+    description: 'Verified and approved'
+  },
+  { 
+    value: 'pending', 
+    label: 'Pending', 
+    icon: <Clock className="w-4 h-4" />,
+    color: 'bg-orange-400',
+    description: 'Awaiting action'
+  },
+  { 
+    value: 'cancelled', 
+    label: 'Cancelled', 
+    icon: <XCircle className="w-4 h-4" />,
+    color: 'bg-red-400',
+    description: 'No longer needed'
+  },
+  { 
+    value: 'completed', 
+    label: 'Completed', 
+    icon: <CheckCircle2 className="w-4 h-4" />,
+    color: 'bg-purple-400',
+    description: 'Successfully finished'
+  },
 ];
 
 function App() {
@@ -141,18 +172,13 @@ function App() {
               {/* Filter Controls */}
               <div className="flex flex-wrap items-center gap-3">
                 {/* Status Filter */}
-                <div className="relative">
-                  <select 
-                    className="appearance-none bg-white/90 border border-gray-200 rounded-xl px-4 py-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    {STATUS_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
-                </div>
+               <Select
+              label="Filter by Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={STATUS_OPTIONS}
+              placeholder="Select a status..."
+            />
                 
                 {/* Date Range Picker */}
                 <CalendarDatePicker
