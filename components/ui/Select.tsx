@@ -52,11 +52,7 @@ export function Select({
 
   return (
     <div className={`relative ${className}`}>
-      {label && (
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          {label}
-        </label>
-      )}
+   
       
       <Listbox value={value} onChange={onChange} disabled={disabled}>
         <div className="relative">
