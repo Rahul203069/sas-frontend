@@ -17,7 +17,8 @@ import {
   Search,
   Filter,
   ChevronDown,
-  ExternalLink
+  ExternalLink,
+  Menu
 } from 'lucide-react';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
 
@@ -135,6 +136,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
@@ -181,168 +183,198 @@ function App() {
 
   const getBgColor = (type: string) => {
     const colors = {
-      message_sent: 'bg-blue-25',
-      meeting_booked: 'bg-green-25',
-      hot_lead: 'bg-orange-25',
-      reply_received: 'bg-purple-25',
-      call_completed: 'bg-emerald-25',
-      error: 'bg-red-25',
-      automation_complete: 'bg-blue-25'
+      message_sent: 'bg-blue-50',
+      meeting_booked: 'bg-green-50',
+      hot_lead: 'bg-orange-50',
+      reply_received: 'bg-purple-50',
+      call_completed: 'bg-emerald-50',
+      error: 'bg-red-50',
+      automation_complete: 'bg-blue-50'
     };
-    return colors[type as keyof typeof colors] || 'bg-gray-50 dark:bg-gray-950/30';
+    return colors[type as keyof typeof colors] || 'bg-gray-50';
   };
 
   return (
     <Sidebarwrapper>
-
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      {/* Sidebar */}
-     
-
-      {/* Main Content */}
-      <div className="ml-64 p-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Notifications & Logs
-          </h2>
-          <p className="text-gray-600">
-            Track all lead interactions, automations, and system events
-          </p>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8 shadow-sm">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Search */}
-            <div className="flex-1 min-w-[300px] relative">
-              <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by lead name or message..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              />
-            </div>
-
-            {/* Category Filter */}
-            <div className="relative" ref={categoryDropdownRef}>
-              <button
-                onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
-                className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <Filter size={16} />
-                <span>{selectedCategory}</span>
-                <ChevronDown size={16} />
-              </button>
-              
-              {categoryDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-                  {filterCategories.map((category) => (
-                      <button
-                      key={category}
-                      onClick={() => {
-                        setSelectedCategory(category);
-                        setCategoryDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg transition-colors"
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Date Range Filter */}
-            <div className="relative" ref={dateDropdownRef}>
-              <button
-                onClick={() => setDateDropdownOpen(!dateDropdownOpen)}
-                className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <span>{selectedDateRange}</span>
-                <ChevronDown size={16} />
-              </button>
-              
-              {dateDropdownOpen && (
-                <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-                  {dateRanges.map((range) => (
-                    <button
-                    key={range}
-                    onClick={() => {
-                        setSelectedDateRange(range);
-                        setDateDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg transition-colors"
-                    >
-                      {range}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+      <div className="min-h-screen bg-gray-50 text-gray-900">
+        {/* Main Content - Responsive margins */}
+        <div className="lg:ml-64 p-4 sm:p-6 lg:p-8">
+          {/* Header */}
+          <div className="mb-6 lg:mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              Notifications & Logs
+            </h2>
+            <p className="text-sm sm:text-base text-gray-600">
+              Track all lead interactions, automations, and system events
+            </p>
           </div>
-        </div>
 
-        {/* Notifications Timeline */}
-        <div className="space-y-4">
-          {filteredNotifications.map((notification, index) => {
-              const Icon = notification.icon;
-              return (
-                  <div
-                  key={notification.id}
-                  className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all duration-200 group"
+          {/* Filters */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6 lg:mb-8 shadow-sm">
+            {/* Mobile Filter Toggle */}
+            <div className="lg:hidden mb-4">
+              <button
+                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                className="flex items-center justify-between w-full px-4 py-2 bg-gray-50 rounded-lg text-gray-700 font-medium"
               >
-                <div className="flex items-start space-x-4">
-                  {/* Icon */}
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-lg ${getBgColor(notification.type)} flex items-center justify-center`}>
-                    <Icon size={20} className={getNotificationColor(notification.type)} />
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                          {notification.title}
-                        </h3>
-                        <p className="text-gray-600 mb-2">
-                          {notification.message}
-                        </p>
-                        <span className="text-sm text-gray-500">
-                          {notification.timestamp}
-                        </span>
+                <span className="flex items-center space-x-2">
+                  <Filter size={16} />
+                  <span>Filters</span>
+                </span>
+                <ChevronDown 
+                  size={16} 
+                  className={`transform transition-transform ${filtersExpanded ? 'rotate-180' : ''}`} 
+                />
+              </button>
+            </div>
+
+            {/* Filter Content */}
+            <div className={`${filtersExpanded ? 'block' : 'hidden'} lg:block`}>
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                {/* Search - Full width on mobile */}
+                <div className="flex-1 min-w-0 relative order-1 lg:order-1">
+                  <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by lead name or message..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm sm:text-base"
+                  />
+                </div>
+
+                {/* Filters row on mobile, inline on desktop */}
+                <div className="flex flex-col sm:flex-row gap-3 lg:gap-4 order-2 lg:order-2">
+                  {/* Category Filter */}
+                  <div className="relative flex-1 sm:flex-none" ref={categoryDropdownRef}>
+                    <button
+                      onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+                      className="flex items-center justify-between w-full sm:w-auto space-x-2 px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors text-sm sm:text-base"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Filter size={16} className="sm:hidden" />
+                        <span className="whitespace-nowrap">{selectedCategory}</span>
                       </div>
-                      
-                      {/* Action Button */}
-                      <button className="ml-4 flex items-center space-x-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                        <span>View Lead</span>
-                        <ExternalLink size={14} />
-                      </button>
-                    </div>
+                      <ChevronDown size={16} />
+                    </button>
+                    
+                    {categoryDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-full sm:w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                        {filterCategories.map((category) => (
+                          <button
+                            key={category}
+                            onClick={() => {
+                              setSelectedCategory(category);
+                              setCategoryDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg transition-colors text-sm sm:text-base"
+                          >
+                            {category}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Date Range Filter */}
+                  <div className="relative flex-1 sm:flex-none" ref={dateDropdownRef}>
+                    <button
+                      onClick={() => setDateDropdownOpen(!dateDropdownOpen)}
+                      className="flex items-center justify-between w-full sm:w-auto space-x-2 px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors text-sm sm:text-base"
+                    >
+                      <span className="whitespace-nowrap">{selectedDateRange}</span>
+                      <ChevronDown size={16} />
+                    </button>
+                    
+                    {dateDropdownOpen && (
+                      <div className="absolute top-full right-0 mt-2 w-full sm:w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                        {dateRanges.map((range) => (
+                          <button
+                            key={range}
+                            onClick={() => {
+                              setSelectedDateRange(range);
+                              setDateDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg transition-colors text-sm sm:text-base"
+                          >
+                            {range}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {/* Empty State */}
-        {filteredNotifications.length === 0 && (
-            <div className="text-center py-16">
-            <Bell size={48} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              No notifications found
-            </h3>
-            <p className="text-gray-600">
-              Try adjusting your filters or search terms
-            </p>
+            </div>
           </div>
-        )}
+
+          {/* Notifications Timeline */}
+          <div className="space-y-3 sm:space-y-4">
+            {filteredNotifications.map((notification, index) => {
+              const Icon = notification.icon;
+              return (
+                <div
+                  key={notification.id}
+                  className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 group"
+                >
+                  <div className="flex items-start space-x-3 sm:space-x-4">
+                    {/* Icon */}
+                    <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${getBgColor(notification.type)} flex items-center justify-center`}>
+                      <Icon size={16} className={`sm:w-5 sm:h-5 ${getNotificationColor(notification.type)}`} />
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 leading-tight">
+                            {notification.title}
+                          </h3>
+                          <p className="text-sm sm:text-base text-gray-600 mb-2 line-clamp-2 sm:line-clamp-none">
+                            {notification.message}
+                          </p>
+                          <span className="text-xs sm:text-sm text-gray-500">
+                            {notification.timestamp}
+                          </span>
+                        </div>
+                        
+                        {/* Action Button - Always visible on mobile, hover on desktop */}
+                        <button className="flex items-center space-x-1 px-3 py-1.5 text-xs sm:text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100 self-start">
+                          <span className="whitespace-nowrap">View Lead</span>
+                          <ExternalLink size={12} className="sm:w-3.5 sm:h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Empty State */}
+          {filteredNotifications.length === 0 && (
+            <div className="text-center py-12 sm:py-16">
+              <Bell size={40} className="sm:w-12 sm:h-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                No notifications found
+              </h3>
+              <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto">
+                Try adjusting your filters or search terms
+              </p>
+            </div>
+          )}
+
+          {/* Show results count on mobile */}
+          {filteredNotifications.length > 0 && (
+            <div className="mt-6 text-center sm:hidden">
+              <p className="text-sm text-gray-500">
+                Showing {filteredNotifications.length} notification{filteredNotifications.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-        </Sidebarwrapper>
+    </Sidebarwrapper>
   );
 }
 
