@@ -3,8 +3,8 @@ import twilio from 'twilio';
 
 // Initialize Twilio client for sending responses
 const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
+  process.env.SID,
+  process.env.TOKEN
 );
 
 export async function POST(request) {
