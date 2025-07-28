@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     
     // 3. Send auto-response if needed
 
-      await sendSMSResponse(smsData.From, 'hey weebhook is working just fine', smsData.To);
+      await sendSMSResponse(smsData.To, 'hey weebhook is working just fine', smsData.From);
     
     
     // 4. Update lead status and trigger notifications
