@@ -52,18 +52,8 @@ export async function POST(request: Request) {
     const incomingMessage = messageData.body.toLowerCase().trim();
 console.log('Incoming message:', incomingMessage);
     // Basic auto-responder logic
-    if (incomingMessage.includes('hello') || incomingMessage.includes('hi')) {
-      responseMessage = 'Hello! Thanks for contacting us. How can we help you today?';
-    } else if (incomingMessage.includes('help') || incomingMessage.includes('support')) {
-      responseMessage = 'We\'re here to help! Please describe your issue and we\'ll get back to you soon.';
-    } else if (incomingMessage.includes('hours') || incomingMessage.includes('open')) {
-      responseMessage = 'Our business hours are Monday-Friday 9AM-6PM PST. We\'ll respond to your message during business hours.';
-    } else if (incomingMessage.includes('pricing') || incomingMessage.includes('price')) {
-      responseMessage = 'Thanks for your interest in our pricing! Please visit our website or call us for detailed pricing information.';
-    } else {
-      responseMessage = 'Thanks for your message! We\'ve received it and will get back to you soon.';
-    }
-
+   
+    responseMessage = `are bahi weebhook chalu hao bahio`;
     // Send automated response (optional)
  
 
