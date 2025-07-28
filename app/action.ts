@@ -826,13 +826,14 @@ type,
     } 
 
 
-    export async function  SendMessage(message:{role:'user'|'assistant',content:string},testchatid:string){
+    export async function  SendMessage(message:[{role:'user'|'assistant',content:string}],testchatid:string){
 
 
 
 try{
 
   console.log(message,testchatid)
+
 
   const testchat:any = await prisma.testchat.findUnique({where:{id:testchatid}});
 
@@ -885,6 +886,12 @@ console.log(e);
 }
 
     } 
+
+
+
+
+
+
 
 
 

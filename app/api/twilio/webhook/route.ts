@@ -1,93 +1,93 @@
-
-
 import { NextResponse } from 'next/server';
 import twilio from 'twilio';
 
-// Twilio credentials (store these in environment variables)
-const accountSid = process.env.SID;
-const authToken = process.env.TOKEN;
-const twilioPhoneNumber = '+15592457719';
+// Initialize Twilio client for sending responses
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
-// Initialize Twilio client
-const client = twilio(accountSid, authToken);
-
-export async function POST(request: Request) {
+export async function POST(request) {
   try {
-    // Parse the incoming form data from Twilio
-    const body = await request.text();
-    console.log('Raw body:', body);
-    const params = new URLSearchParams(body);
+    // Parse the form data from Twilio webhook
+    const formData = await request.formData();
     
-    // Extract message details from Twilio webhook
-    const messageData = {
-      messageSid: params.get('MessageSid'),
-      accountSid: params.get('AccountSid'),
-      from: params.get('From'),
-      to: params.get('To'),
-      body: params.get('Body'),
-      numMedia: params.get('NumMedia'),
-      timestamp: new Date().toISOString()
+    // Extract SMS webhook parameters
+    const smsData = {
+      MessageSid: formData.get('MessageSid'),
+      AccountSid: formData.get('AccountSid'),
+      MessagingServiceSid: formData.get('MessagingServiceSid'),
+      From: formData.get('From'),
+      To: formData.get('To'),
+      Body: formData.get('Body'),
+      NumMedia: formData.get('NumMedia'),
+      MediaUrl0: formData.get('MediaUrl0'),
+      MediaContentType0: formData.get('MediaContentType0'),
+      SmsSid: formData.get('SmsSid'),
+      SmsStatus: formData.get('SmsStatus'),
+      ApiVersion: formData.get('ApiVersion'),
+      FromCity: formData.get('FromCity'),
+      FromState: formData.get('FromState'),
+      FromZip: formData.get('FromZip'),
+      FromCountry: formData.get('FromCountry'),
+      ToCity: formData.get('ToCity'),
+      ToState: formData.get('ToState'),
+      ToZip: formData.get('ToZip'),
+      ToCountry: formData.get('ToCountry'),
     };
 
-    console.log('Received SMS:', messageData);
-
-    // Validate the webhook (optional but recommended)
-    const twilioSignature = request.headers.get('x-twilio-signature');
-    const url = request.url;
+    // Log incoming SMS for debugging
+    console.log('📱 INCOMING SMS WEBHOOK');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('From:', smsData.From);
+    console.log('To:', smsData.To);
+    console.log('Message:', smsData.Body);
+    console.log('Message SID:', smsData.MessageSid);
+    console.log('Has Media:', parseInt(smsData.NumMedia || '0') > 0);
     
-    // Uncomment below for signature validation
-    // const isValid = twilio.validateRequest(
-    //   authToken,
-    //   twilioSignature,
-    //   url,
-    //   body
-    // );
+    // Process the incoming SMS
+    const incomingSMS = {
+      messageId: smsData.MessageSid,
+      from: smsData.From,
+      to: smsData.To,
+      body: smsData.Body || '',
+      timestamp: new Date(),
+      hasMedia: parseInt(smsData.NumMedia || '0') > 0,
+      mediaUrl: smsData.MediaUrl0 || null,
+      mediaType: smsData.MediaContentType0 || null,
+      location: {
+        city: smsData.FromCity,
+        state: smsData.FromState,
+        zip: smsData.FromZip,
+        country: smsData.FromCountry
+      },
+      status: 'received'
+    };
+
+    // Here's where you'd implement your business logic:
     
-    // if (!isValid) {
-    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
-    // }
-
-    // Process the message based on content
-    let responseMessage = '';
-    const incomingMessage = messageData.body.toLowerCase().trim();
-console.log('Incoming message:', incomingMessage);
-    // Basic auto-responder logic
-    if (incomingMessage.includes('hello') || incomingMessage.includes('hi')) {
-      responseMessage = 'Hello! Thanks for contacting us. How can we help you today?';
-    } else if (incomingMessage.includes('help') || incomingMessage.includes('support')) {
-      responseMessage = 'We\'re here to help! Please describe your issue and we\'ll get back to you soon.';
-    } else if (incomingMessage.includes('hours') || incomingMessage.includes('open')) {
-      responseMessage = 'Our business hours are Monday-Friday 9AM-6PM PST. We\'ll respond to your message during business hours.';
-    } else if (incomingMessage.includes('pricing') || incomingMessage.includes('price')) {
-      responseMessage = 'Thanks for your interest in our pricing! Please visit our website or call us for detailed pricing information.';
-    } else {
-      responseMessage = 'Thanks for your message! We\'ve received it and will get back to you soon.';
+    // 1. Save to database
+    // await saveMessageToDatabase(incomingSMS);
+    
+    // 2. Process message for lead qualification
+    const response = await processLeadMessage(incomingSMS);
+    
+    // 3. Send auto-response if needed
+    if (response.shouldReply) {
+      await sendSMSResponse(smsData.From, response.message, smsData.To);
     }
+    
+    // 4. Update lead status and trigger notifications
+    // await updateLeadStatus(smsData.From, response.leadScore);
+    // await triggerNotifications(response);
 
-    // Send automated response (optional)
-    if (responseMessage) {
-      await client.messages.create({
-        body: responseMessage,
-        from: twilioPhoneNumber,
-        to: messageData.from
-      });
-    }
-
-    // Store message in database (implement your database logic here)
-    await storeMessageInDatabase(messageData);
-
-    // Send notification to your team (implement your notification logic here)
-    await notifyTeam(messageData);
-
-    // Return TwiML response (optional - for more complex responses)
+    // Return TwiML response (optional - for immediate replies)
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-      <Message>
-        <Body>${responseMessage}</Body>
-      </Message>
+      ${response.shouldReply ? `<Message>${response.message}</Message>` : ''}
     </Response>`;
 
-    return new Response(twimlResponse, {
+    return new NextResponse(twimlResponse, {
       status: 200,
       headers: {
         'Content-Type': 'text/xml',
@@ -95,71 +95,78 @@ console.log('Incoming message:', incomingMessage);
     });
 
   } catch (error) {
-    console.error('Error processing Twilio webhook:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('❌ SMS Webhook Error:', error);
+    
+    // Return empty TwiML response on error
+    return new NextResponse(
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+      {
+        status: 200,
+        headers: { 'Content-Type': 'text/xml' },
+      }
+    );
   }
 }
 
-// GET method for testing webhook endpoint
+// Business logic functions
+async function processLeadMessage(smsData) {
+  const message = smsData.body.toLowerCase();
+  const phoneNumber = smsData.from;
+  
+  // Simple lead qualification logic (replace with your AI logic)
+  let leadScore = 0;
+  let responseMessage = '';
+  let shouldReply = true;
+  
+  // Keywords that indicate interest
+  const hotKeywords = ['price', 'cost', 'buy', 'purchase', 'demo', 'meeting'];
+  const warmKeywords = ['interested', 'info', 'learn more', 'tell me'];
+  const coldKeywords = ['stop', 'unsubscribe', 'not interested'];
+  
+  if (coldKeywords.some(keyword => message.includes(keyword))) {
+    leadScore = 10; // Cold lead
+    responseMessage = "Thanks for letting us know. You've been removed from our list.";
+  } else if (hotKeywords.some(keyword => message.includes(keyword))) {
+    leadScore = 85; // Hot lead
+    responseMessage = "Great! I'd love to help you with that. Let me connect you with one of our specialists. What's the best time to call you?";
+  } else if (warmKeywords.some(keyword => message.includes(keyword))) {
+    leadScore = 60; // Warm lead
+    responseMessage = "Thanks for your interest! Here's some quick info about our services. Would you like to schedule a brief call to discuss your needs?";
+  } else {
+    leadScore = 30; // Neutral
+    responseMessage = "Hi! Thanks for reaching out. How can I help you today?";
+  }
+  
+  console.log(`🎯 Lead Score: ${leadScore}/100 for ${phoneNumber}`);
+  
+  return {
+    leadScore,
+    message: responseMessage,
+    shouldReply,
+    leadStatus: leadScore >= 70 ? 'hot' : leadScore >= 50 ? 'warm' : 'cold'
+  };
+}
+
+async function sendSMSResponse(to, message, from) {
+  try {
+    const response = await twilioClient.messages.create({
+      body: message,
+      from: from, // Your Twilio number
+      to: to // Lead's number
+    });
+    
+    console.log(`✅ SMS Response sent: ${response.sid}`);
+    return response;
+  } catch (error) {
+    console.error('❌ Failed to send SMS response:', error);
+    throw error;
+  }
+}
+
+// Handle GET requests (for testing)
 export async function GET() {
   return NextResponse.json({ 
-    message: 'Twilio webhook endpoint is working',
+    message: 'Twilio SMS Webhook endpoint is active',
     timestamp: new Date().toISOString()
   });
-}
-
-// Helper function to store message in database
-async function storeMessageInDatabase(messageData) {
-  try {
-    // Example with Prisma (adjust based on your database)
-    // await prisma.message.create({
-    //   data: {
-    //     messageSid: messageData.messageSid,
-    //     from: messageData.from,
-    //     to: messageData.to,
-    //     body: messageData.body,
-    //     timestamp: messageData.timestamp,
-    //   },
-    // });
-    
-    // Example with MongoDB
-    // await db.collection('messages').insertOne(messageData);
-    
-    console.log('Message stored in database:', messageData.messageSid);
-  } catch (error) {
-    console.error('Error storing message in database:', error);
-  }
-}
-
-// Helper function to notify your team
-async function notifyTeam(messageData) {
-  try {
-    // Send email notification
-    // await sendEmail({
-    //   to: 'team@yourcompany.com',
-    //   subject: 'New SMS Received',
-    //   html: `
-    //     <h3>New SMS Message</h3>
-    //     <p><strong>From:</strong> ${messageData.from}</p>
-    //     <p><strong>Message:</strong> ${messageData.body}</p>
-    //     <p><strong>Time:</strong> ${messageData.timestamp}</p>
-    //   `
-    // });
-
-    // Send Slack notification
-    // await sendSlackMessage({
-    //   channel: '#customer-messages',
-    //   text: `New SMS from ${messageData.from}: ${messageData.body}`
-    // });
-
-    // Send push notification
-    // await sendPushNotification({
-    //   title: 'New SMS Received',
-    //   body: `From ${messageData.from}: ${messageData.body}`
-    // });
-
-    console.log('Team notified about new message');
-  } catch (error) {
-    console.error('Error notifying team:', error);
-  }
 }

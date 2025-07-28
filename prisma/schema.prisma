@@ -62,6 +62,7 @@ model User {
   leads        Lead[]
   conversations Conversation[]
   appointments Appointment[]
+  chatSessions ChatSession[]
 }
 
 model Twilio {
@@ -102,6 +103,7 @@ model Lead {
   contacts     Contact[]  // Store multiple emails & phone numbers
   conversations Conversation[]
   appointments Appointment[]
+  chatSessions ChatSession[] // Add this line for the relation
 }
 
 enum LeadStatus {
@@ -142,7 +144,8 @@ model Conversation {
   updatedAt   DateTime  @updatedAt
 
   lead        Lead      @relation(fields: [leadId], references: [id])
-  user        User?     @relation(fields: [userId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
+  chatSession ChatSession?
 }
 
 model Message {
@@ -180,6 +183,22 @@ model Appointment {
 
   lead         Lead @relation(fields: [leadId], references: [id])
   user         User @relation(fields: [userId], references: [id])
+}
+
+
+model ChatSession {
+  id          String   @id @default(uuid())
+  userId      String
+  leadId      String
+conversationId String? @unique
+
+  sessionId   String   @unique
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+lead         Lead     @relation(fields: [leadId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 
