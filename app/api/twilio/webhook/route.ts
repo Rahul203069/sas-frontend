@@ -152,8 +152,8 @@ async function sendSMSResponse(to, message, from) {
   try {
     const response = await twilioClient.messages.create({
       body: message,
-      from: from, // Your Twilio number
-      to: to // Lead's number
+      from: '+15592457719', // Your Twilio number
+      to: '+18777804236' // Lead's number
     });
     
     console.log(`✅ SMS Response sent: ${response.sid}`);
