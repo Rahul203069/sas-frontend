@@ -73,9 +73,9 @@ export async function POST(request) {
     const response = await processLeadMessage(incomingSMS);
     
     // 3. Send auto-response if needed
-    if (response.shouldReply) {
-      await sendSMSResponse(smsData.From, response.message, smsData.To);
-    }
+
+      await sendSMSResponse(smsData.From, 'hey weebhook is working just fine', smsData.To);
+    
     
     // 4. Update lead status and trigger notifications
     // await updateLeadStatus(smsData.From, response.leadScore);
