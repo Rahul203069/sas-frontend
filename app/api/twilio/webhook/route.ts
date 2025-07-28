@@ -65,14 +65,7 @@ console.log('Incoming message:', incomingMessage);
     }
 
     // Send automated response (optional)
-    if (responseMessage) {
-      const message=await client.messages.create({
-        body: responseMessage,
-        from: twilioPhoneNumber,
-        to: messageData.from
-      });
-      console.log('Response message sent:', message);
-    }
+ 
 
     // Store message in database (implement your database logic here)
     await storeMessageInDatabase(messageData);
