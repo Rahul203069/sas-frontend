@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+//@ts-nocheck
+import { NextResponse ,NextRequest} from 'next/server';
 import twilio from 'twilio';
 
 // Initialize Twilio client for sending responses
@@ -7,7 +8,7 @@ const twilioClient = twilio(
   process.env.TOKEN
 );
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     // Parse the form data from Twilio webhook
     const formData = await request.formData();
