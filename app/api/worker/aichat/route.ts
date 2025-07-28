@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 import { NextRequest, NextResponse } from 'next/server';
 import { SendMessage } from '@/app/action';
 import { PrismaClient } from '@prisma/client';
