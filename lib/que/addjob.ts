@@ -1,89 +1,60 @@
-// lib/add-email-job.ts
-import { Queue, JobsOptions } from 'bullmq';
 import IORedis from 'ioredis';
+import { Queue } from 'bullmq';
+import { Worker } from 'bullmq';
 
-// Types
-interface EmailJobData {
-  to: string;
-  subject: string;
-  body: string;
-  template?: string;
-  from?: string;
-  cc?: string[];
-  bcc?: string[];
-  attachments?: Array<{
-    filename: string;
-    path: string;
-  }>;
-}
 
-interface JobResult {
-  success: boolean;
-  jobId: string;
-  queueName: string;
-
-  name: string;
-}
-
-// Redis connection (same config as your worker)
-const redis = new IORedis({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
-    password: process.env.REDIS_PASSWORD || undefined,
-    db: process.env.REDIS_DB ? Number(process.env.REDIS_DB) : 0,
-    maxRetriesPerRequest: 3,
-    lazyConnect: true
-});
-
-// Create email queue instance (matches your worker config)
-const emailQueue = new Queue('email', {
-  connection: redis,
-defaultJobOptions: {
-      removeOnComplete: 100,  // Keep last 100 completed jobs
-      removeOnFail: 50,       // Keep last 50 failed jobs
-      attempts: 3,            // Maximum retry attempts
-      backoff: {
-        type: 'exponential',
-        delay: 1000,          // Base delay in milliseconds
-            // Maximum delay cap
-      },
-      delay: 0,               // Initial delay
-      priority: 0             // Job priority (higher = more priority)
-    },
-  
-});
-
-/**
- * Add an email job to the email queue
- * @param jobType - Type of email job (e.g., 'welcome-email', 'newsletter', 'password-reset')
- * @param emailData - Email data containing recipient, subject, body, etc.
- * @param options - Additional job options (priority, delay, etc.)
- * @returns Promise with job result
- */
-export async function AddJobToQueue(
-  name: string,
-  emailData: any,
-  options: JobsOptions = {}
-): Promise<JobResult> {
-  try {
-    const job = await emailQueue.add(name, emailData, options);
-
-    console.log(`Email job ${job.id} added to queue:`, {
-      type: name,
-      to: emailData.to,
-      subject: emailData.subject,
-      options: job.opts
-    });
-    return {
-      success: true,
-      jobId: job.id!,
-      queueName: 'email',
+export const connection = new IORedis({
+  host: 'redis-14719.c52.us-east-1-4.ec2.redns.redis-cloud.com',
+  port: 14719,
+  username: 'default',
+  password: 'yQyAarXGbqeLyXH71c1zzBUXGIupoj4H',
    
-      name
-    };
-    
-    } catch (error) {
-      console.error('Failed to add email job:', error);
-      throw error;
-    }
-  }
+  maxRetriesPerRequest: null, // Disable automatic retries
+});
+
+
+export const myQueue = new Queue('smsreply', {
+  connection,
+});
+
+myQueue.waitUntilReady().then(() => {
+  console.log(`✅ Queue "${myQueue.name}" is ready and connected to Redis`);
+}).catch(err => {
+  console.error('❌ Queue connection failed:', err);
+});
+
+
+
+myQueue.on('error', (err) => {
+  console.error('Queue encountered an error:', err);        
+});
+
+
+
+myQueue.on('waiting', (jobId) => {
+  console.log(`Job ${jobId} is waiting to be processed`);
+});
+
+
+
+
+
+const worker = new Worker('my-queue', async (job) => {
+  console.log('Processing job:', job.name, job.data);
+}, {
+  connection,
+});
+
+
+worker.on('ready', () => {
+  console.log('Worker is ready to process jobs');
+});
+worker.on('failed', (job, err) => {
+  console.error(`Job ${job} failed with error:`, err);
+});
+worker.on('completed', (job) => {
+  console.log(`Job ${job.id} completed successfully`);
+});
+worker.on('error', (err) => {
+  console.error('Worker encountered an error:', err);
+});
