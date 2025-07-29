@@ -7,7 +7,7 @@ import { Pagination } from '@/components/Pagination';
 import { CalendarDatePicker } from '@/components/CalendarDatePicker';
 import { FilterChip } from '@/components/FilterChip';
 import Sidebarwrapper from '@/components/Sidebarwrapper';
-import { Select } from '@/components/ui/Select';
+import { Select } from '@/components/ui/Selects';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -138,7 +138,7 @@ function App() {
 
   return (
     <Sidebarwrapper>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white">
         {/* Header */}
         <header>
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -153,7 +153,7 @@ function App() {
         </header>
 
         {/* Enhanced Filters Section */}
-        <div className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="bg-white/80 backdrop-blur-md border-b  border-gray-200 sticky top-0 z-10 shadow-b-sm">
           <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
             {/* Main Filter Bar */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-4">
