@@ -2,7 +2,7 @@
 "use client";
 import React, { useState, useMemo } from 'react';
 
-import { SelectItem, SelectContent,SelectTrigger,SelectValue, Select } from "@/components/ui/select";
+import { SelectItem, SelectContent,SelectTrigger,SelectValue, Select } from "@/components/ui/options";
 import {
   Bell,
   Search,
