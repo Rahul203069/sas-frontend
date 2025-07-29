@@ -1,4 +1,4 @@
-//@ts-nocheck
+
 
 
 
@@ -826,7 +826,78 @@ type,
     } 
 
 
-    export async function  SendMessage(message:[{role:'user'|'assistant',content:string}],testchatid:string){
+
+
+
+
+
+     export async function  SendMessageapi(message:any,conversationId:string){
+
+
+
+try{
+
+  console.log(message,conversationId)
+
+
+  const conversation:any = await prisma.conversation.findUnique({where:{id:conversationId}});
+
+const botid=conversation.buyerbotid || conversation.sellerbotid;
+let prompt:string=''
+
+if(conversation.type.toLowerCase()==='buyer'){
+const bot= await prisma.buyerBot.findUnique({where:{id:botid}})
+ prompt=bot.prompt||''
+
+
+
+}else{
+  
+  const bot= await prisma.sellerBot.findUnique({where:{id:botid}})
+   prompt=bot.prompt||''
+ 
+}
+
+
+
+
+  // const response = await anthropic.messages.create({
+  //   model: 'claude-3-7-sonnet-20250219',
+  //   max_tokens: 160,
+  //   temperature:0.4,
+  //   
+  //   messages: [{ role: 'assistant', content: 'hey,joseph i am talking from sunshine realestates , i hope you are in good health ,are you up for talking about your property' }, ...(message.map((item)=>{return({ role:item.sender,content:item.text})}))]
+  // });
+  
+
+  
+
+  console.log(message,'message');
+
+  const response= await generateGemniChatResponse({ messages: [ ...(message.map((item)=>{return({ role:item.sender,content:item.text})}))],systemPrompt:prompt})
+
+  
+
+  
+  return {role:'assistant', content:response.message}
+  
+  
+
+
+}catch(e){
+
+console.log(e);
+
+  return null;
+}
+
+    } 
+
+
+
+
+
+    export async function  SendMessage(message:any,testchatid:string){
 
 
 

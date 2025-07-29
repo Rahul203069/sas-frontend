@@ -23,6 +23,13 @@ enum NotificationType {
   SYSTEM_ALERT
 }
 
+enum bottype {
+
+BUYER
+SELLER
+
+}
+
 
 model notification {
   id          String   @id @default(uuid())
@@ -70,7 +77,7 @@ model Twilio {
   userId      String   @unique // Ensures one Twilio per User
   phone       String
   areacode    Int?
-  sid         String
+  sid         String @unique
   metadata    Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -137,20 +144,25 @@ enum ContactType {
 model Conversation {
   id          String   @id @default(uuid())  
   leadId      String   
-  userId      String?
+  userId      String
+  type        bottype     
+buyerbotid  String? 
+sellerbotid String?
+  leadphone   String
+  userphone    String
   messages    Message[]
   aiSummary   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   lead        Lead      @relation(fields: [leadId], references: [id])
-  user        User?    @relation(fields: [userId], references: [id])
+  user        User    @relation(fields: [userId], references: [id])
   chatSession ChatSession?
 }
 
 model Message {
   id           String     @id @default(uuid())  
-  conversationId String  
+  conversationId String    
   sender        SenderType
   content       String
   timestamp     DateTime   @default(now())

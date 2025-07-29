@@ -9,14 +9,14 @@ const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { conversationId, message, sender } = body;
-
+        const { from,to,accountSid,body,timestamp} = body;
+        //from and to are phone numebrs body is the message
         // Input validation
         const missingFields = [];
         if (!conversationId) missingFields.push('conversationId');
         if (!message) missingFields.push('message');
         if (!sender) missingFields.push('sender');
-
+        
         if (missingFields.length > 0) {
             return NextResponse.json(
                 {
@@ -26,15 +26,37 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+        
+
+        //finding the conversaiontion session
+        const conversation =await prisma.conversation.findFirst()
+
+
+
+        // Save user message
+
+        await prisma.message.create({
+            data: {
+                conversationId:conversation.id,
+                sender:'LEAD',
+                content: body,
+                timestamp: new Date(timestamp)
+            }
+        });
+
+
 
         // Fetch message history
         const conversation = await prisma.conversation.findFirst({
-            where: { id: conversationId },
+           where:{
+         leadphone:from,userphone:to,user:{twilio:{sid:accountSid,phone:to}}
+        },
             select: {
                 messages: { select: { sender: true, content: true }, },
-                lead:{select:{name:true,email:true,phone:true}},
+                lead:{select:{name:true,email:true,phone:true,}},
             }
         });
+
 
         if (!conversation) {
             return NextResponse.json(
@@ -43,7 +65,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const response = await SendMessage(conversation.messages, conversationId);
+
+        
+
+        const response = await SendMessage(conversation.messages, conversation.id);
 
         // Save AI response
         if (response?.content) {
