@@ -8,14 +8,16 @@ const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { from,to,accountSid,body,timestamp} = body;
+        const bod = await request.json();
+        const { from, to, accountSid, body, timestamp } = bod;
         //from and to are phone numebrs body is the message
         // Input validation
         const missingFields = [];
-        if (!conversationId) missingFields.push('conversationId');
-        if (!message) missingFields.push('message');
-        if (!sender) missingFields.push('sender');
+        if (!from) missingFields.push('from');
+        if (!to) missingFields.push('to');
+        if (!accountSid) missingFields.push('accountSid');
+        if (!body) missingFields.push('body');
+        if (!timestamp) missingFields.push('timestamp');
         
         if (missingFields.length > 0) {
             return NextResponse.json(
@@ -29,9 +31,18 @@ export async function POST(request: NextRequest) {
         
 
         //finding the conversaiontion session
-        const conversation =await prisma.conversation.findFirst()
+   
 
 
+        const conversation = await prisma.conversation.findFirst({
+           where:{
+         leadphone:from,userphone:to,user:{twilio:{sid:accountSid,phone:to}}
+        },
+            select: {
+                messages: { select: { sender: true, content: true }, },
+                lead:{select:{name:true,email:true,phone:true,}},
+            }
+        });
 
         // Save user message
 
@@ -47,15 +58,6 @@ export async function POST(request: NextRequest) {
 
 
         // Fetch message history
-        const conversation = await prisma.conversation.findFirst({
-           where:{
-         leadphone:from,userphone:to,user:{twilio:{sid:accountSid,phone:to}}
-        },
-            select: {
-                messages: { select: { sender: true, content: true }, },
-                lead:{select:{name:true,email:true,phone:true,}},
-            }
-        });
 
 
         if (!conversation) {
@@ -74,7 +76,7 @@ export async function POST(request: NextRequest) {
         if (response?.content) {
             await prisma.message.create({
                 data: {
-                    conversationId,
+                    conversationId: conversation.id,
                     sender: 'AI',
                     content: response.content,
                     timestamp: new Date()
