@@ -14,7 +14,25 @@ function page() {
   }
   return (
     <Sidebarwrapper>
-    <div className="min-h-screen bg-gray-100 ">
+    <div className="min-h-screen bg-gray-50">
+      
+
+           
+<header className=" ">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <h1 className="text-2xl font-bold text-gray-900">Upload leads</h1>
+              </div>
+            </div>
+           
+          </div>
+        </div>
+      </header>
+      
+      
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-6">
        
         

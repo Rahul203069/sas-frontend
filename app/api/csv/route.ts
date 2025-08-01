@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { initializeconvoqueue } from '@/lib/que/addjob';
 
 
 const prisma = new PrismaClient();
@@ -29,16 +30,20 @@ const leadsIds= await prisma.lead.findMany({ where: { userId: userid }, take: co
 
        if(response.success){
 
-     const intialise_worker= await worker(); 
+ 
      
-         const queue = createsmsQueue();
+         
      
-         // Add all jobs in parallel with Promise.all
-         await Promise.all(
-           leadsIds.map(leadId =>
-             queue.add('send-initial-sms', { leadId, userId }, { delay: 1000, attempts: 3 })
-           )
-         );
+       console.time('JobQueueTime'); // Start timing
+
+await Promise.all(
+  leadsIds.map(leadId =>
+    initializeconvoqueue.add('initial-sms', { leadId, userId }, { delay: 1000, attempts: 3 })
+  )
+);
+
+console.timeEnd('JobQueueTime'); // End timing and log time taken
+
         return NextResponse.json({ message: `${response.count} leads stored successfully` }, { status: 200 });
        }
        else{

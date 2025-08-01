@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import twilio from 'twilio';
-import {  myQueue } from '@/lib/que/addjob';
+import {  smsreplyqueue } from '@/lib/que/addjob';
 
 // Twilio credentials (store these in environment variables)
 const accountSid = process.env.SID;
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
 
 
-await myQueue.add('replysms',{from:messageData.from,to:messageData.to,body:messageData.body,timestamp:messageData.timestamp,accountSid:messageData.accountSid,messageSid:messageData.messageSid})
+await smsreplyqueue.add('replysms',{from:messageData.from,to:messageData.to,body:messageData.body,timestamp:messageData.timestamp,accountSid:messageData.accountSid,messageSid:messageData.messageSid})
 
     // Store message in database (implement your database logic here)
     await storeMessageInDatabase(messageData);

@@ -13,25 +13,25 @@ export const connection = new IORedis({
 });
 
 
-export const myQueue = new Queue('smsreply', {
+export const smsreplyqueue = new Queue('smsreply', {
   connection,
 });
 
-myQueue.waitUntilReady().then(() => {
-  console.log(`✅ Queue "${myQueue.name}" is ready and connected to Redis`);
+smsreplyqueue.waitUntilReady().then(() => {
+  console.log(`✅ Queue "${smsreplyqueue.name}" is ready and connected to Redis`);
 }).catch(err => {
   console.error('❌ Queue connection failed:', err);
 });
 
 
 
-myQueue.on('error', (err) => {
+smsreplyqueue.on('error', (err) => {
   console.error('Queue encountered an error:', err);        
 });
 
 
 
-myQueue.on('waiting', (jobId) => {
+smsreplyqueue.on('waiting', (jobId) => {
   console.log(`Job ${jobId} is waiting to be processed`);
 });
 
@@ -39,22 +39,35 @@ myQueue.on('waiting', (jobId) => {
 
 
 
-const worker = new Worker('my-queue', async (job) => {
-  console.log('Processing job:', job.name, job.data);
-}, {
+export const initializeconvoqueue = new Queue('initial-sms', {
   connection,
 });
 
+initializeconvoqueue.waitUntilReady().then(() => {
+  console.log(`✅ Queue "${initializeconvoqueue.name}" is ready and connected to Redis`);
+}).catch(err => {
+  console.error('❌ Queue connection failed:', err);
+});
 
-worker.on('ready', () => {
-  console.log('Worker is ready to process jobs');
+
+
+initializeconvoqueue.on('error', (err) => {
+  console.error('Queue encountered an error:', err);        
 });
-worker.on('failed', (job, err) => {
-  console.error(`Job ${job} failed with error:`, err);
+
+
+
+initializeconvoqueue.on('waiting', (jobId) => {
+  console.log(`Job ${jobId} is waiting to be processed`);
 });
-worker.on('completed', (job) => {
-  console.log(`Job ${job.id} completed successfully`);
-});
-worker.on('error', (err) => {
-  console.error('Worker encountered an error:', err);
-});
+
+
+
+
+
+
+
+
+
+
+

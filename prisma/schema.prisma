@@ -57,8 +57,8 @@ model User {
   phonenumber   String?
    googlecalendarmetadata  Json?
   timeZone   String?
- buyerbot       BuyerBot?
- sellerbot      SellerBot?  
+   bot       Bot?
+ 
   availabaleSlots Json?
   phoneverifed   Boolean @default(false)
   // One-to-one relation with Twilio
@@ -97,6 +97,8 @@ model Lead {
   name         String
   email        String[] 
   phone        String[]
+  smscapablephone String[]
+  state       LeadState?
   address      String
   status       LeadStatus @default(JUNK)
   source       LeadSource
@@ -106,7 +108,8 @@ model Lead {
   userId       String
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-
+  botId           String @unique
+  bot              Bot @relation(fields: [botId], references: [id])
   contacts     Contact[]  // Store multiple emails & phone numbers
   conversations Conversation[]
   appointments Appointment[]
@@ -117,6 +120,13 @@ enum LeadStatus {
   HOT
   WARM
   JUNK
+}
+
+enum LeadState {
+  INITIATED
+  REPLIED
+  TALKING
+  APPOINTMENT
 }
 
 enum LeadSource {
@@ -145,11 +155,11 @@ model Conversation {
   id          String   @id @default(uuid())  
   leadId      String   
   userId      String
-  type        bottype     
-buyerbotid  String? 
-sellerbotid String?
-  leadphone   String
-  userphone    String
+  type        bottype?     
+
+botId      String? @unique
+  bot         Bot? @relation(fields: [botId], references: [id])
+
   messages    Message[]
   aiSummary   String?
   createdAt   DateTime  @default(now())
@@ -162,7 +172,9 @@ sellerbotid String?
 
 model Message {
   id           String     @id @default(uuid())  
-  conversationId String    
+  conversationId String  
+  leadId       String
+  botId        String
   sender        SenderType
   content       String
   timestamp     DateTime   @default(now())
@@ -244,16 +256,17 @@ model EnrichmentQuestion {
   question String
   
   // Relations
-  buyerBots  BuyerBot[] @relation("BuyerBotEnrichment")
-  sellerBots SellerBot[] @relation("SellerBotEnrichment")
+  Bot Bot[] @relation("BotEnrichment")
+ 
 }
 
-model BuyerBot {
+model Bot {
   id                String   @id @default(uuid())
   userid            String  @unique
+  type              bottype
   name              String
   bussinessinfo     String
-  enrichment        EnrichmentQuestion[] @relation("BuyerBotEnrichment")
+  enrichment        EnrichmentQuestion[] @relation("BotEnrichment")
   appointmentsetter Boolean 
 
   islive            Boolean @default(false)
@@ -262,22 +275,15 @@ model BuyerBot {
 
   // Reference to User
   user              User     @relation(fields: [userid], references: [id])
+
+  // Opposite relation to Lead
+  lead              Lead?
+
+  // Opposite relation to Conversation
+  conversation      Conversation?
 }
 
-model SellerBot {
-  id                String   @id @default(uuid())
-  userid            String   @unique
-  name              String
-  bussinessinfo     String
-  enrichment        EnrichmentQuestion[] @relation("SellerBotEnrichment")  // Fixed relation name
-  islive            Boolean @default(false)
-  appointmentsetter Boolean 
-  startingmessage   String
-  prompt            String?
 
-  // Reference to User
-  user              User     @relation(fields: [userid], references: [id])
-}
 
 
 
