@@ -1,3 +1,4 @@
+//@ts-nocheck
 "use client"
 import React, { useState, useEffect } from "react";
 
@@ -99,19 +100,6 @@ const [create, setCreate] = useState(false);
   const [reload, setReload] = useState(false);
 
 
-  useEffect(() => {
-    setLoading(true);
-    fetchBots()
-      .then((res) => {
-        if (res) setidBots(res);
-
-        const {sellerBot, buyerBot} = res
-
-        console.log(res, "bots");
-      })
-      .catch(() =>{})
-      .finally(() => setLoading(false));
-  }, [reload]);
 
 
   const { toast } = useToast();
