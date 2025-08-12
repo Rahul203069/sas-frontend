@@ -40,9 +40,10 @@ const leadsIds= await prisma.lead.findMany({ where: { userId: userid }, take: co
      
        console.time('JobQueueTime'); // Start timing
 
+
 await Promise.all(
   leadsIds.map(leadId =>
-    initializeconvoqueue.add('initial-sms', { leadId, userid,botId }, { delay: 1000, attempts: 3 })
+    initializeconvoqueue.add('initial-sms', { leadId, userid,botId })
   )
 );
 

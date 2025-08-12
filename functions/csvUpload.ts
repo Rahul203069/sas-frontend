@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 // Define the input type based on your data structure
 interface LeadInput {
   email: string[];
-  phonenumber: string[];
+  phone: string[];
   name: string;
   address?: string; // Assuming address is optional
 
@@ -17,6 +17,7 @@ interface LeadInput {
 
 // Function to store multiple leads
 export async function storeLeads(leadsData: LeadInput[],userId:string,botid:string) {
+  console.log(leadsData,"leadsData")
 
   try {
     // Use createMany for bulk insert (more efficient)
@@ -28,10 +29,10 @@ export async function storeLeads(leadsData: LeadInput[],userId:string,botid:stri
         email: lead.email,
         address: lead.address || '', // Assuming address is optional
         source:'MANUAL',
-        phone: lead.phonenumber,
+        phone: lead.phone,
 
        
-      })),
+      })), 
 
      
     });

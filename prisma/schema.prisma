@@ -165,7 +165,7 @@ model Conversation {
   userId      String
   type        bottype?     
 
-botId      String? @unique
+botId      String
   bot         Bot? @relation(fields: [botId], references: [id])
 
   messages    Message[]
@@ -281,6 +281,7 @@ model Bot {
   startingmessage   String
   prompt            String?
 
+
   // Reference to User
   user              User  @relation(fields: [userid], references: [id])
 
@@ -288,7 +289,7 @@ model Bot {
   lead              Lead[]
 
   // Opposite relation to Conversation
-  conversation      Conversation?
+  conversation      Conversation[]
 }
 
 

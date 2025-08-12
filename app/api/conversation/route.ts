@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -21,6 +21,7 @@ const {leadId, userId, botId} = await request.json();
         select:{
             user:{include:{twilio: true}},
             lead:true,
+            id:true,
             bot:true,
         }
 
