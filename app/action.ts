@@ -17,7 +17,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 
 
-import { ReceiptEuro, Truck } from 'lucide-react';
+import { Car, ReceiptEuro, Truck } from 'lucide-react';
 
 import Anthropic from "@anthropic-ai/sdk/index.mjs";
 import ChatbotConfig from '@/components/ChatbotConfig';
@@ -26,6 +26,7 @@ import { datacatalog } from 'googleapis/build/src/apis/datacatalog';
 import { get } from 'http';
 import { extractGeneratedSlots } from '@/utils';
 import { bookSlot } from './calender';
+import { TwilioPurchaser } from '@/functions/twilio';
 
 
 
@@ -286,8 +287,10 @@ export async function getuser(){
 
     const user = await prisma.user.findUnique({where:{
 id:session?.user?.id
-    }})
+    },include:{
+      twilio:true}})
  
+      console.log(user, 'user found');
 
     if(!user){
       redirect('/login')
@@ -366,13 +369,36 @@ export async function AddareaCode(areacode:string){
       return { redirect: "/login", error: "User session missing" };
     }
 
+    const areacod= areacode.toString()
+
     try{
 
         const user = await prisma.user.update({where:{id:session.user.id},data:{
 
-            areacode
+            areacode:areacod
         }})
 
+
+        const twilio = new TwilioPurchaser(process.env.SIDFREE, process.env.TOKENFREE);
+
+       const data=  await twilio.purchaseMultipleNumbers(1)
+console.log(data, 'twilio data');
+       if(data[0].success){
+
+        await prisma.twilio.create({
+            data:{
+              
+                sid:data[0].sid,
+                authToken:data[0].authToken,
+                accountSid: data[0].accountSid,
+                metadata: {},
+                phone:data[0].phoneNumber,
+                userId:user.id
+            }
+        })
+
+        return {success:true,redirect:'/dashboard'}
+       }
 
         if(user){
 
@@ -384,7 +410,7 @@ export async function AddareaCode(areacode:string){
 
 
     catch(e){
-
+console.log(e, 'error in adding area code');
         return{error:'Something went wrong try again later'}
     }
 
@@ -558,16 +584,12 @@ above are the two propmpt join them to build anew prompt which can work for both
   try{
   
     
-    if(type==='seller'){
-      const bo=await prisma.sellerBot.update({where:{id:bot.id},data:{prompt}})
-      console.log(bo)
-    }
     
-    else{
-      
-      const bo= await prisma.buyerBot.update({where:{id:bot.id},data:{prompt}})
+      const bo=await prisma.bot.update({where:{id:bot.id},data:{prompt}})
       console.log(bo)
-    }
+   
+    
+
     
   }catch(e){
   
@@ -585,20 +607,42 @@ above are the two propmpt join them to build anew prompt which can work for both
 
 
       export async function ConfigureBot(BotConfigs: ChatbotConfig) {
-        console.log(BotConfigs, 'bot config');
+
+
+
+
+const{name,type,create}= BotConfigs;
+const session = await getServerSession(authOptions);
+
+if (!session?.user?.id) {
+  return redirect('/login');
+}
+
+if(create){
+
+  
+  console.log(BotConfigs, 'bot config');
+  
+  
+  const userId = session.user.id;
+  
+  try{
+
+    await prisma.bot.create({
+      data: {name,type,userid:userId}})
       
-        const session = await getServerSession(authOptions);
+      return {success:true,redirect:'/dashboard'}
+    }catch(e){
+
+      return{success:false,error:'Something went wrong, try again later'}
+    }
+  }
+
       
-        if (!session?.user?.id) {
-          return redirect('/login');
-        }
-      
-        const userId = session.user.id;
-      
-        if (BotConfigs.leadType.toLowerCase() === 'buyer') {
+
           if (BotConfigs.id) {
             // Update existing buyer bot
-            const existingBot = await prisma.buyerBot.findUnique({
+            const existingBot = await prisma.bot.findUnique({
               where: { id: BotConfigs.id },
               include: { enrichment: true }
             });
@@ -622,7 +666,7 @@ above are the two propmpt join them to build anew prompt which can work for both
             console.log(questionsToAdd, 'questions to add');
             console.log(questionsToRemove, 'questions to remove');
       
-            const bot = await prisma.buyerBot.update({
+            const bot = await prisma.bot.update({
               where: { id: BotConfigs.id },
               data: {
                 appointmentsetter: BotConfigs.enableAppointmentSetter,
@@ -633,7 +677,7 @@ above are the two propmpt join them to build anew prompt which can work for both
                   create: questionsToAdd.map(question => ({ question }))
                 },
                 startingmessage: BotConfigs.startingMessage,
-                userid: userId,
+              
               },
               include: { enrichment: true }
             });
@@ -643,86 +687,7 @@ above are the two propmpt join them to build anew prompt which can work for both
           }
       
           // Create new buyer bot
-          const bot = await prisma.buyerBot.create({
-            data: {
-              appointmentsetter: BotConfigs.enableAppointmentSetter,
-              name: BotConfigs.botName,
-              bussinessinfo: BotConfigs.bussinessinfo,
-              enrichment: {
-                create: BotConfigs.enrichmentQuestions.map(q => ({ question: q.question }))
-              },
-              startingmessage: BotConfigs.startingMessage,
-              userid: userId,
-            },
-            include: { enrichment: true }
-          });
-      
-          await GenrertatPrompt(bot, 'buyer');
-          return;
-        } else {
-          if (BotConfigs.id) {
-            // Update existing seller bot
-            const existingBot = await prisma.sellerBot.findUnique({
-              where: { id: BotConfigs.id },
-              include: { enrichment: true }
-            });
-      
-            if (!existingBot) {
-              throw new Error('Bot not found');
-            }
-      
-            const existingQuestions = existingBot.enrichment.map(e => e.question);
-            const existingQuestionMap: { [key: string]: string } = existingBot.enrichment.reduce((map, e) => {
-              map[e.question] = e.id;
-              return map;
-            }, {});
-      
-            const newQuestions = BotConfigs.enrichmentQuestions.map(q => q.question);
-            const questionsToAdd = newQuestions.filter(q => !existingQuestions.includes(q));
-            const questionsToRemove = existingQuestions
-              .filter(q => !newQuestions.includes(q))
-              .map(q => existingQuestionMap[q]);
-      
-            console.log(`Added ${questionsToAdd.length} new questions and removed ${questionsToRemove.length} old questions`);
-      
-            const bot = await prisma.sellerBot.update({
-              where: { id: BotConfigs.id },
-              data: {
-                appointmentsetter: BotConfigs.enableAppointmentSetter,
-                name: BotConfigs.botName,
-                bussinessinfo: BotConfigs.bussinessinfo,
-                enrichment: {
-                  deleteMany: questionsToRemove.length > 0 ? { id: { in: questionsToRemove } } : undefined,
-                  create: questionsToAdd.map(question => ({ question }))
-                },
-                startingmessage: BotConfigs.startingMessage,
-                userid: userId,
-              },
-              include: { enrichment: true }
-            });
-      
-            await GenrertatPrompt(bot, 'seller');
-            return;
-          }
-      
-          // Create new seller bot
-          const bot = await prisma.sellerBot.create({
-            data: {
-              appointmentsetter: BotConfigs.enableAppointmentSetter,
-              name: BotConfigs.botName,
-              bussinessinfo: BotConfigs.bussinessinfo,
-              enrichment: {
-                create: BotConfigs.enrichmentQuestions.map(q => ({ question: q.question }))
-              },
-              startingmessage: BotConfigs.startingMessage,
-              userid: userId,
-            },
-            include: { enrichment: true }
-          });
-      
-          await GenrertatPrompt(bot, 'seller');
-          return;
-        }
+       
       }
 
 
@@ -734,43 +699,68 @@ try{
 
 console.log(id,type)
 
+if(id&&type){
+
+
+
+const bots= await prisma.bot.findFirst({
+  where:{
+    id,
+    type:type.toUpperCase()
+  },
+  include:{enrichment:true}
+})
+
+
+return bots
+
+
+}
+
 const user = await getuser()
 if (!user) {
   return { error: "User not found" };
 }
 
-if(type&&type.toLowerCase().includes('seller')){
-  const bot =await prisma.sellerBot.findUnique({where:{
-    id,
-  },
-
-include:{enrichment:true}})
 
 
-  return bot
-
-}
-
-
-if(type&&type.toLowerCase().includes('buyer')){
-  const bot =await prisma.buyerBot.findUnique({where:{
-    id,
-  },
-include:{enrichment:true}
+const bot = await prisma.bot.findMany({
+  where:{userid:user.id}
+ 
 })
 
+// if(type&&type.toLowerCase().includes('seller')){
+//   const bot =await prisma.sellerBot.findUnique({where:{
+//     id,
+//   },
+
+// include:{enrichment:true}})
 
 
-  return bot
-}
+//   return bot
+
+// }
+
+
+// if(type&&type.toLowerCase().includes('buyer')){
+//   const bot =await prisma.buyerBot.findUnique({where:{
+//     id,
+//   },
+// include:{enrichment:true}
+// })
 
 
 
-const bot= await prisma.user.findUnique({where:{
-  id:user.id,
-},
-select:{buyerbot:true,sellerbot:true}
-})
+//   return bot
+// }
+
+
+
+// const bot= await prisma.user.findUnique({where:{
+//   id:user.id,
+// },
+// select:{buyerbot:true,sellerbot:true}
+// })
 
 
 return bot
@@ -789,7 +779,7 @@ return bot
     export   async function IntiateTestchat(botid:string,type:string){
 
 try{
-  console.log(botid,type,'gjhvjhvjhvukvtfhvytfvutfjhvtg')
+ 
 
   const user = await getuser();
   if(!user){
@@ -797,23 +787,30 @@ try{
   }
 
 
-  const chatexist=await prisma.testchat.findFirst({where:{userid:user.id,...(type === 'buyer' ? { buyerbotid: botid } : { sellerbotid: botid })}})
+  const chatexist=await prisma.testchat.findFirst({where:{userid:user.id,botid}})
 
   if(chatexist){
-    return chatexist
+    
+
+    await prisma.testchat.delete({where:{id:chatexist.id}})
+    
   }
+  
+  
+      const newtestchat =  await prisma.testchat.create({data:{
+     userid:user.id,
+     botid,
+     
+      }})
 
- const newtestchat =  await prisma.testchat.create({data:{
-
-userid:user.id,
-type,
-
-...(type === 'buyer' ? { buyerbotid: botid } : { sellerbotid: botid })
 
 
- }}) 
+      return  newtestchat
 
- console.log(chatexist,'chat exist')
+ 
+
+
+ 
   
   
 }catch(e){
@@ -845,18 +842,12 @@ try{
 const botid=conversation.buyerbotid || conversation.sellerbotid;
 let prompt:string=''
 
-if(conversation.type.toLowerCase()==='buyer'){
 const bot= await prisma.buyerBot.findUnique({where:{id:botid}})
  prompt=bot.prompt||''
 
 
 
-}else{
-  
-  const bot= await prisma.sellerBot.findUnique({where:{id:botid}})
-   prompt=bot.prompt||''
- 
-}
+
 
 
 
@@ -908,21 +899,16 @@ try{
 
   const testchat:any = await prisma.testchat.findUnique({where:{id:testchatid}});
 
-const botid=testchat.buyerbotid || testchat.sellerbotid;
+const botid=testchat.botid;
 let prompt:string=''
-if(testchat.type.toLowerCase()==='buyer'){
-const bot= await prisma.buyerBot.findUnique({where:{id:botid}})
+
+const bot= await prisma.Bot.findUnique({where:{id:botid}})
  prompt=bot.prompt||''
 
 
 
-}else{
-  
-  const bot= await prisma.sellerBot.findUnique({where:{id:botid}})
-   prompt=bot.prompt||''
- 
-}
 
+  
 
 
 

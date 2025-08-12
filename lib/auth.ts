@@ -2,8 +2,10 @@
 
 
 import { PrismaClient } from "@prisma/client";
+import e from "express";
 import { NextAuthOptions, User } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { start } from "repl";
 const prisma = new PrismaClient();
 declare module "next-auth" {
   interface Session {
@@ -40,11 +42,59 @@ declare module "next-auth" {
         // Check if user exists in the database
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email },
+          select:{bot:true,id:true}
         });
+
+        console.log(existingUser,'existingUser');
+        if (existingUser && existingUser.bot.length<2 ) {
+          // If user exists and has bots, allow sign-in
+        console.log('User exists, proceeding with bot creation',existingUser);
+
+ console.log('User exists, proceeding with bot creation', existingUser);
+
+await prisma.bot.create({
+  data: {
+    name: "alex",
+    type: "BUYER",
+    bussinessinfo: "",
+    startingmessage: "",
+    islive: false,
+    appointmentsetter: false,
+    user: {
+      connect: {
+        id: existingUser.id // Connect to existing user
+      }
+    }
+  }
+});
+
+await prisma.bot.create({
+  data: {
+    name: "lisa",
+    type: "SELLER",
+    bussinessinfo: "",
+    startingmessage: "",
+    islive: false,
+    appointmentsetter: false,
+    user: {
+      connect: {
+        id: existingUser.id // Connect to existing user
+      }
+    }
+  }
+});
+
+
+          return true; // Allow sign-in
+          
+        }
+
         
         if (!existingUser) {
           // Create user if they don't exist
-          await prisma.user.create({
+
+
+    const userdata=  await prisma.user.create({
             data: {
               name: user.name || "Unknown",
               email: user.email,
@@ -52,8 +102,43 @@ declare module "next-auth" {
               password: "defaultPassword", // Add a default password or generate one
             },
           });
+          
+       console.log('User exists, proceeding with bot creation', existingUser);
+
+await prisma.bot.create({
+  data: {
+    name: "alex",
+    type: "BUYER",
+    bussinessinfo: "",
+    startingmessage: "",
+    islive: false,
+    appointmentsetter: false,
+    user: {
+      connect: {
+        id: userdata.id // Connect to existing user
+      }
+    }
+  }
+});
+
+await prisma.bot.create({
+  data: {
+    name: "lisa",
+    type: "SELLER",
+    bussinessinfo: "",
+    startingmessage: "",
+    islive: false,
+    appointmentsetter: false,
+    user: {
+      connect: {
+        id: userdata.id // Connect to existing user
+      }
+    }
+  }
+});
+
+          
         }
-        
         return true; // Allow sign-in
       } catch (error) {
         console.error('error',error);
@@ -64,6 +149,7 @@ declare module "next-auth" {
       if (session?.user?.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: session.user.email },
+          include:{twilio:true}
         });
         console.log(dbUser,'heheh');
 

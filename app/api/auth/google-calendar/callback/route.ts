@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   }
 
   if (!code) {
-    redirect("/appointment");
+    redirect("/appointments");
     return NextResponse.json({ error: "No authorization code provided!" });
   }
 

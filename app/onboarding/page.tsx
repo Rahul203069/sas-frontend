@@ -99,17 +99,19 @@ setloader(false)
 
 const verifyotp= await verifyOtp(otp)
 if(verifyotp.success){
-
+(setloader(false))
   setCurrentStep('zipcode');
-}
-if(verifyotp.redirect){
-  Router.replace(verifyotp.redirect)
-}
-else{
+  
+}else{
   setloader(false)
   toast(verifyotp.error)
   
 }
+if(verifyotp.redirect){
+  Router.replace(verifyotp.redirect)
+setloader(false)
+}
+
 return
 
     } else {
@@ -126,6 +128,8 @@ return
     }
     if(arecode?.error){
       toast(arecode.error);
+      setloader(false)
+      return;
     }
       // Handle successful login
       console.log('Login successful');

@@ -57,7 +57,7 @@ model User {
   phonenumber   String?
    googlecalendarmetadata  Json?
   timeZone   String?
-   bot       Bot?
+   bot       Bot[]
  
   availabaleSlots Json?
   phoneverifed   Boolean @default(false)
@@ -77,12 +77,15 @@ model Twilio {
   userId      String   @unique // Ensures one Twilio per User
   phone       String
   areacode    Int?
-  sid         String @unique
+  authToken   String
+  accountSid  String 
+  sid         String 
   metadata    Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   // Reference to User - establishes the one-to-one relation
+
   user        User     @relation(fields: [userId], references: [id])
 }
 
@@ -93,29 +96,34 @@ enum Role {
 }
 
 model Lead {
-  id           String     @id @default(uuid())  
-  name         String
-  email        String[] 
-  phone        String[]
+  id              String      @id @default(uuid())
+  name            String
+  email           String[]
+  phone           String[]
   smscapablephone String[]
-  state       LeadState?
-  address      String
-  status       LeadStatus @default(JUNK)
-  source       LeadSource
-   data    Json?
-   initiated   Boolean @default(false)
-  owner   User      @relation(fields: [userId], references: [id])
-  userId       String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  botId           String @unique
-  bot              Bot @relation(fields: [botId], references: [id])
-  contacts     Contact[]  // Store multiple emails & phone numbers
-  conversations Conversation[]
-  appointments Appointment[]
-  chatSessions ChatSession[] // Add this line for the relation
+  state           LeadState?
+  address         String
+  status          LeadStatus  @default(JUNK)
+  source          LeadSource
+  data            Json?
+  initiated       Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // User relation
+  userId          String
+  owner           User        @relation(fields: [userId], references: [id])
+  
+  // Bot relation - botId is NOT unique, allowing multiple leads per bot
+  botId           String      // No @unique constraint = non-unique
+  bot             Bot         @relation(fields: [botId], references: [id])
+  
+  // Other relations
+  contacts        Contact[]
+  conversations   Conversation[]
+  appointments    Appointment[]
+  chatSessions    ChatSession[]
 }
-
 enum LeadStatus {
   HOT
   WARM
@@ -166,15 +174,15 @@ botId      String? @unique
   updatedAt   DateTime  @updatedAt
 
   lead        Lead      @relation(fields: [leadId], references: [id])
-  user        User    @relation(fields: [userId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
   chatSession ChatSession?
 }
 
 model Message {
   id           String     @id @default(uuid())  
   conversationId String  
-  leadId       String
   botId        String
+  leadId       String
   sender        SenderType
   content       String
   timestamp     DateTime   @default(now())
@@ -229,11 +237,10 @@ lead         Lead     @relation(fields: [leadId], references: [id])
 model Testchat {
 
 id String  @id @default(uuid())
-buyerbotid  String? @unique
-sellerbotid String? @unique
+botid  String?
+
 userid    String 
-  
-type    String
+
 message   Json?  
 availableslots Json?
 generatedslots Json?
@@ -262,10 +269,11 @@ model EnrichmentQuestion {
 
 model Bot {
   id                String   @id @default(uuid())
-  userid            String  @unique
+  userid            String  
   type              bottype
   name              String
   bussinessinfo     String
+
   enrichment        EnrichmentQuestion[] @relation("BotEnrichment")
   appointmentsetter Boolean 
 
@@ -274,10 +282,10 @@ model Bot {
   prompt            String?
 
   // Reference to User
-  user              User     @relation(fields: [userid], references: [id])
+  user              User  @relation(fields: [userid], references: [id])
 
   // Opposite relation to Lead
-  lead              Lead?
+  lead              Lead[]
 
   // Opposite relation to Conversation
   conversation      Conversation?

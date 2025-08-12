@@ -61,7 +61,7 @@ const CSVImport: React.FC = () => {
     }
   }, [csvData]);
   
-  const handleReviewComplete = useCallback(() => {
+  const handleReviewComplete = useCallback(async() => {
     // Validate the mapped data
     if (mappedData.length > 0) {
       const { valid, errors } = validateMappedData(mappedData);
@@ -74,14 +74,17 @@ const CSVImport: React.FC = () => {
       
       // If valid, move to the success screen
 
-axios.post('/api/csv', {
+ axios.post('/api/csv', {
         csvData: mappedData,
-        userId}).then(res=>{
+        botId:userId}).then(res=>{
+          console.log(res, "CSV ");
           if(res.status===200){
+            console.log(res.data, "CSV data saved successfully");
              setStep(5);
 
           }else{
             setError('Failed to save data. Please try again.');
+            setStep(1)
           }
         }).finally(() => {setIsLoading(false);});
 

@@ -1,5 +1,6 @@
 //@ts-nocheck
 "use client"
+
 import React, { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import BotSelector from "@/components/bot/BotSelector";
 import ImportLeadsModal from "@/components/bot/ImportLeadsModal";
 import TestBotDialog from "@/components/bot/TestBotDialog";
 import AnalyticsOverview from "@/components/bot/AnalyticsOverview";
+import { get } from "http";
 
 
 // Simple toast implementation for demonstration
@@ -100,6 +102,19 @@ const [create, setCreate] = useState(false);
   const [reload, setReload] = useState(false);
 
 
+  // useEffect(() => {
+  //   setLoading(true);
+  //   fetchBots()
+  //     .then((res) => {
+  //       if (res) setidBots(res);
+
+  //       const {sellerBot, buyerBot} = res
+
+  //       console.log(res, "bots");
+  //     })
+  //     .catch(() =>{})
+  //     .finally(() => setLoading(false));
+  // }, [reload]);
 
 
   const { toast } = useToast();
@@ -110,7 +125,9 @@ const [create, setCreate] = useState(false);
 
   const loadBots = async () => {
     try {
-      const botList = await Bot.list();
+      const botList = await fetchBots();
+      console.log(botList, "Loaded Bots");
+
       setBots(botList);
     } catch (error) {
       toast({
@@ -201,12 +218,14 @@ const [create, setCreate] = useState(false);
     }
   };
 
-  const buyerBot = bots.find(bot => bot.type === 'buyer');
-  const sellerBot = bots.find(bot => bot.type === 'seller');
+  const buyerBot = bots.find(bot => bot.type === 'BUYER');
+  const sellerBot = bots.find(bot => bot.type === 'SELLER');
   const currentBot = activeBot === 'buyer' ? buyerBot : sellerBot;
 
   if (loading) {
     return (
+      <Sidebarwrapper>
+
       <div className="p-4 sm:p-8 max-w-7xl mx-auto">
         <div className="animate-pulse space-y-8">
           <div className="space-y-4">
@@ -225,6 +244,7 @@ const [create, setCreate] = useState(false);
           <div className="h-96 bg-slate-200 rounded-lg"></div>
         </div>
       </div>
+      </Sidebarwrapper>
     );
   }
 

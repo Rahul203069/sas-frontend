@@ -17,8 +17,19 @@ const {leadId, userId, botId} = await request.json();
     try{
 
         const CreateConversation = await prisma.conversation.create({
-            data: {botId, userId,leadId}})
- return NextResponse.json({ status:'sucess', message: 'Conversation created successfully', conversation: CreateConversation }, { status: 200 });
+            data: {botId, userId,leadId},
+        select:{
+            user:{include:{twilio: true}},
+            lead:true,
+            bot:true,
+        }
+
+        
+        
+        
+    })
+
+    return NextResponse.json({ status:'success', message: 'Conversation created successfully', conversation: CreateConversation }, { status: 200 });
 
     }catch (error) {
         console.error('Error processing request:', error);

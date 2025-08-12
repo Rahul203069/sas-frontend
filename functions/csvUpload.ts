@@ -1,4 +1,4 @@
-//@ts-nocheck
+
 
 
 
@@ -16,21 +16,28 @@ interface LeadInput {
 }
 
 // Function to store multiple leads
-export async function storeLeads(leadsData: LeadInput[],userId:string) {
+export async function storeLeads(leadsData: LeadInput[],userId:string,botid:string) {
+
   try {
     // Use createMany for bulk insert (more efficient)
     const result = await prisma.lead.createMany({
       data:leadsData.map(lead => ({
         userId: userId,
         name: lead.name,
+        botId: botid,
         email: lead.email,
         address: lead.address || '', // Assuming address is optional
         source:'MANUAL',
         phone: lead.phonenumber,
+
        
       })),
-      skipDuplicates: true, // Skip if duplicate entries exist
+
+     
     });
+
+    console.log('Bulk insert result:', result);
+
     
     console.log(`Successfully stored ${result.count} leads`);
     return {
