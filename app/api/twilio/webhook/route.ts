@@ -7,8 +7,7 @@ import {  smsreplyqueue } from '@/lib/que/addjob';
 // Twilio credentials (store these in environment variables)
 const accountSid = process.env.SID;
 const authToken = process.env.TOKEN;
-
-
+const twilioPhoneNumber = '+15592457719';
 
 // Initialize Twilio client
 const client = twilio(accountSid, authToken);
