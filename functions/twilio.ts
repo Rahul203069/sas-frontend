@@ -358,3 +358,27 @@ export { TwilioPurchaser, testCredentials };
 if (require.main === module) {
   main().catch(console.error);
 }
+
+
+
+
+
+
+import twilio from 'twilio';
+
+const accountSid = process.env.TWILIO_ACCOUNT_SID as string; // Use environment variables for security
+const authToken = process.env.TWILIO_AUTH_TOKEN as string;
+
+const client = twilio(accountSid, authToken);
+
+// Replace with the Phone Number SID you want to delete (starts with 'PN...')
+const phoneNumberSid = 'PNXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
+
+async function deleteNumber() {
+  try {
+    await client.incomingPhoneNumbers(phoneNumberSid).remove();
+    console.log(`✅ Phone number ${phoneNumberSid} deleted successfully`);
+  } catch (error) {
+    console.error('❌ Error deleting number:', error);
+  }
+}

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       timestamp: new Date().toISOString()
     };
 
-    console.log('Received SMS:', messageData);
+    console.log('Received SMS:', messageData.body);
 
 
 

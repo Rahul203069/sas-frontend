@@ -89,6 +89,7 @@ export default function LeadCard({ lead, onViewDetails, onStartConversation }) {
             onClick={() => onViewDetails(lead)}
           >
             View Details
+            
           </Button>
           <Button 
             className="flex-1 bg-indigo-600 hover:bg-indigo-700"

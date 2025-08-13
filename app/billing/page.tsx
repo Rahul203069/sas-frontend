@@ -1,4 +1,4 @@
-//@ts-nocheck
+//@ts-nocheck`
 import Sidebarwrapper from '@/components/Sidebarwrapper';
 import React from 'react';
 
