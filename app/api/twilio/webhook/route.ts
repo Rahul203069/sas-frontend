@@ -1,8 +1,9 @@
-
+//@ts-nocheck
 
 import { NextResponse } from 'next/server';
 import twilio from 'twilio';
 import {  smsreplyqueue } from '@/lib/que/addjob';
+import { sendSMS } from '@/functions/sendsms';
 
 // Twilio credentials (store these in environment variables)
 const accountSid = process.env.SID;
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
 
     console.log('Received SMS:', messageData.body);
 
+await sendSMS(messageData.body,'+917006414367')
 
 
 await smsreplyqueue.add('replysms',{from:messageData.from,to:messageData.to,body:messageData.body,timestamp:messageData.timestamp,accountSid:messageData.accountSid,messageSid:messageData.messageSid})
