@@ -1,5 +1,4 @@
 //@ts-nocheck
-
 import { NextRequest, NextResponse } from 'next/server';
 import { SendMessage } from '@/app/action';
 import { PrismaClient } from '@prisma/client';
@@ -10,7 +9,7 @@ export async function POST(request: NextRequest) {
     try {
         const bod = await request.json();
         const { from, to, accountSid, body, timestamp } = bod;
-        //from and to are phone numebrs body is the message
+
         // Input validation
         const missingFields = [];
         if (!from) missingFields.push('from');
@@ -29,37 +28,45 @@ export async function POST(request: NextRequest) {
             );
         }
         
-
-        //finding the conversaiontion session
-   
-
-
+        // Find conversation using correct schema fields
+        // Assuming you need to find by lead phone and user's Twilio phone
         const conversation = await prisma.conversation.findFirst({
-           where:{
-         leadphone:from,userphone:to,user:{twilio:{sid:accountSid,phone:to}}
-        },
+            where: {
+                lead: {
+                    smscapablephone:from
+                },
+                user: {
+                    twilio: {
+                        phone: to,
+                        accountSid: accountSid
+                    }
+                }
+            },
             select: {
-                messages: { select: { sender: true, content: true }, },
-                lead:{select:{name:true,email:true,phone:true,}},
+                id: true,
+                botId: true,
+                leadId: true,
+                messages: { 
+                    select: { 
+                        sender: true, 
+                        content: true 
+                    },
+                    orderBy: {
+                        timestamp: 'asc'
+                    }
+                },
+                lead: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true,
+                    }
+                }
             }
         });
 
-        // Save user message
-
-        await prisma.message.create({
-            data: {
-                conversationId:conversation.id,
-                sender:'LEAD',
-                content: body,
-                timestamp: new Date(timestamp)
-            }
-        });
-
-
-
-        // Fetch message history
-
-
+        // Check if conversation exists BEFORE using it
         if (!conversation) {
             return NextResponse.json(
                 { success: false, error: 'Conversation not found' },
@@ -67,16 +74,28 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Save user message with all required fields
+        await prisma.message.create({
+            data: {
+                conversationId: conversation.id,
+                botId: conversation.botId,      // ✅ Now included
+                leadId: conversation.leadId,    // ✅ Now included
+                sender: 'LEAD',
+                content: body,
+                timestamp: new Date(timestamp)
+            }
+        });
 
-        
-
+        // Get AI response
         const response = await SendMessage(conversation.messages, conversation.id);
 
-        // Save AI response
+        // Save AI response with all required fields
         if (response?.content) {
             await prisma.message.create({
                 data: {
                     conversationId: conversation.id,
+                    botId: conversation.botId,      // ✅ Now included
+                    leadId: conversation.leadId,    // ✅ Now included
                     sender: 'AI',
                     content: response.content,
                     timestamp: new Date()
@@ -84,7 +103,13 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        return NextResponse.json({ success: true, data: {response,phone:conversation.lead.phone} }, { status: 200 });
+        return NextResponse.json({ 
+            success: true, 
+            data: {
+                response,
+                phone: conversation.lead.phone
+            } 
+        }, { status: 200 });
 
     } catch (error: any) {
         console.error('POST /api/message error:', {
