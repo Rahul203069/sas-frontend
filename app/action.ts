@@ -725,7 +725,8 @@ if (!user) {
 
 
 const bot = await prisma.bot.findMany({
-  where:{userid:user.id}
+  where:{userid:user.id},
+  include:{enrichment:true}
  
 })
 

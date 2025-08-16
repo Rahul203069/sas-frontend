@@ -41,6 +41,7 @@ export default function ChatbotConfig({ setrelode, config,setclose }) {
   const [loader, setloader] = useState(false);
   const [isLeadTypeOpen, setIsLeadTypeOpen] = useState(false);
   
+  console.log(config,'config');
   // Initialize with default or config data
   const [enrichmentQuestions, setEnrichmentQuestions] = useState<EnrichmentQuestion[]>(() => {
     if (config && config.enrichment && config.enrichment.length > 0) {

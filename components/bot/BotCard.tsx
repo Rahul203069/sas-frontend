@@ -1,4 +1,4 @@
-//@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,10 +28,14 @@ import {
   Snowflake,
   MoreHorizontal,
   PlayCircle,
-  PauseCircle
+  PauseCircle,
+  ScrollText
 } from "lucide-react";
 import { format } from "date-fns";
 import StatsCard from "./StatsCard";
+import ShowConfig from "./ShowConfig";
+import BotLogs from "./BotLogs";
+import BotLogsBox from "./BotlogBox";
 
 export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads, onSyncNow }) {
   const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -231,6 +235,8 @@ const handleActivationSuccess = () => {
               </Button>
             </Link> */}
 
+            <ShowConfig config={bot}></ShowConfig>
+
             <Button 
               onClick={() => {router.push(`bot/${bot.id}&${bot.type}`)}}
               variant="outline" 
@@ -248,6 +254,11 @@ const handleActivationSuccess = () => {
               <Upload className="w-4 h-4" />
               Import Leads
             </Button>
+        
+
+
+
+            <BotLogsBox></BotLogsBox>
 
             <Button 
               onClick={handleSync}
@@ -259,6 +270,7 @@ const handleActivationSuccess = () => {
               {isSyncing ? 'Syncing...' : 'Sync Now'}
             </Button>
           </div>
+          
 
           {bot.last_sync && (
             <p className="text-sm text-slate-500 mt-4">

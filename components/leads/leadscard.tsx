@@ -17,7 +17,7 @@ const temperatureIcons = {
   cold: "❄️"
 };
 
-export default function LeadCard({ lead, onViewDetails, onStartConversation }) {
+export default function LeadCards({ lead, onViewDetails, onStartConversation }) {
   const lastMessage = lead.conversation_history?.slice(-1)[0];
   
   return (
@@ -73,7 +73,7 @@ export default function LeadCard({ lead, onViewDetails, onStartConversation }) {
 
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
           <Calendar className="w-3 h-3" />
-          <span>Added {format(new Date(lead.created_date), 'MMM d, yyyy')}</span>
+          <span>Added  12 may 2025</span>
           {lead.last_contact && (
             <>
               <span>•</span>

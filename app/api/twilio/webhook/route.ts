@@ -33,7 +33,6 @@ export async function POST(request: Request) {
 
     console.log('Received SMS:', messageData.body);
 
-await sendSMS(messageData.body,'+917006414367')
 
 
 await smsreplyqueue.add('replysms',{from:messageData.from,to:messageData.to,body:messageData.body,timestamp:messageData.timestamp,accountSid:messageData.accountSid,messageSid:messageData.messageSid})
@@ -45,7 +44,7 @@ await smsreplyqueue.add('replysms',{from:messageData.from,to:messageData.to,body
     await notifyTeam(messageData);
 
     // Just return 200 OK to acknowledge receipt
-    return new Response('OK', { status: 200 });
+    return new Response( { status: 200 });
 
   } catch (error) {
     console.error('Error processing Twilio webhook:', error);
