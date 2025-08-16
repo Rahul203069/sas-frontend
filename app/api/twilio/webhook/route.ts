@@ -44,7 +44,7 @@ await smsreplyqueue.add('replysms',{from:messageData.from,to:messageData.to,body
     await notifyTeam(messageData);
 
     // Just return 200 OK to acknowledge receipt
-    return new Response( { status: 200 });
+    return NextResponse( { status: 200 });
 
   } catch (error) {
     console.error('Error processing Twilio webhook:', error);
