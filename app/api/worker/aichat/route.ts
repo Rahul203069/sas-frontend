@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         const conversation = await prisma.conversation.findFirst({
             where: {
                 lead: {
-                    smscapablephone:from
+                    smscapablephone:{has:from}
                 },
                 user: {
                     twilio: {
