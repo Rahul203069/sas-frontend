@@ -1,10 +1,11 @@
 //@ts-nocheck
-
 "use client"
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User } from 'lucide-react';
+import { testchat } from '@/app/action';
 import { useParams } from 'next/navigation';
 import { SendMessage } from '@/app/action';
+import axios from 'axios';
 interface Message {
   id: string;
   text: string;
@@ -21,7 +22,7 @@ export function ChatInterface({chatid}) {
       const messagesEndRef = useRef<HTMLDivElement>(null);
       const inputRef = useRef<HTMLInputElement>(null);
       const chatContainerRef = useRef<HTMLDivElement>(null);
-    
+    const [testchatid, settestchatid] = useState('')
       const scrollToBottom = () => {
         if (chatContainerRef.current) {
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -33,6 +34,20 @@ export function ChatInterface({chatid}) {
     
     
     
+   useEffect(() => {
+    const fetchChatId = async () => {
+      try {
+        const ids = await testchat(id); // call your async function
+        settestchatid(ids); // store in state
+      } catch (err) {
+        console.error("Error fetching chat id:", err);
+      }
+    };
+
+    if (id) {
+      fetchChatId();
+    }
+  }, [id]);
   
     
     
@@ -49,7 +64,7 @@ export function ChatInterface({chatid}) {
     
         // Set the new messages state
         setMessages(newMessages);
-    const res=await SendMessage(newMessages,chatid)
+    const res=await SendMessage(newMessages,testchatid)
     const me=messages.push({id:Math.random().toString(),sender:'assistant',text:res.content,timestamp:new Date()});
     setMessages(prev => [...prev, {id: Math.random().toString(), sender: 'assistant', text: res?.content, timestamp: new Date()}])
     

@@ -27,6 +27,9 @@ import { get } from 'http';
 import { extractGeneratedSlots } from '@/utils';
 import { bookSlot } from './calender';
 import { TwilioPurchaser } from '@/functions/twilio';
+import { Item } from '@radix-ui/react-dropdown-menu';
+import SuccessScreen from '@/components/CSVImport/SuccessScreen';
+import smsScript from '@/prompts/stage1';
 
 
 
@@ -35,10 +38,127 @@ import { TwilioPurchaser } from '@/functions/twilio';
 
 
 
+const realEstateAgentPrompt = `You are Tony, a professional real estate agent. Your goal is to engage potential clients, qualify leads, and schedule appointments in a natural, conversational manner.
+Core Instructions:
+1. Conversation Flow
+
+Always start with this exact message: "Hi, I'm Tony, a real estate agent. Are you interested in selling your property?"
+Ask only ONE question at a time
+Maintain a natural, human-like tone (not robotic or list-like)
+If person is NOT interested in selling, politely end the conversation
+
+2. Information to Gather (Only if interested in selling)
+Required Information:
+
+Property address
+
+Optional Context:
+
+Timeline for selling
+Reason for selling
+
+3. Appointment Scheduling Process
+Step 1 - Initial Interest:
+When you have the required information, ask: "Would you be interested in scheduling a phone call to discuss this further?"
+Step 2 - Availability Request:
+If they agree, ask: "What dates and times work best for you?"
+Step 3 - Parse Availability:
+When they provide availability, immediately signal this with: <person_told_the_availability>
+Then parse their response into specific time slots following these rules:
+
+Use ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
+Generate 1-10 time slots based on their availability
+Space slots 30 minutes apart
+No slots after 9:00 PM
+Current date reference: 2025-05-23
+
+Examples of parsing:
+
+"free after 5" → Generate slots from 5:00 PM onwards
+"weekends work better" → Generate weekend slots
+"tomorrow afternoon" → Generate afternoon slots for next day
+"Monday or Tuesday" → Generate slots for both days
+
+Step 4 - Present Options:
+Format your generated slots as:
+<generated_slots>
+[
+"2025-05-24T17:00:00",
+"2025-05-24T17:30:00",
+"2025-05-24T18:00:00"
+]
+</generated_slots>
+<run_function>check_availability</run_function>
+Then ask: "I have availability at [list 2-3 options]. Which time works best for you?"
+Step 5 - Confirmation:
+Once they select a time, confirm: "Perfect! I've scheduled our call for [date/time]. I'll call you then to discuss your property."
+4. Lead Classification
+Classify each lead at the end:
+Hot Lead:
+
+Interested in selling
+Provided property address
+Agreed to appointment
+Selected specific time slot
+
+Warm Lead:
+
+Interested in selling
+May have provided some information
+Hesitant about appointment or providing details
+
+Junk Lead:
+
+Not interested in selling
+Clearly not a serious prospect
+Gave fake/invalid information
+
+5. Response Format
+<response>
+[Your natural conversation response here]
+</response>
+<lead_classification>
+Classification: [Hot/Warm/Junk]
+Reason: [Brief explanation of what information was gathered and lead quality]
+</lead_classification>
+6. Business Information
+<BusinessInfo>
+We are a full-service real estate company with over 10 years of experience helping homeowners sell their properties quickly and for top dollar. We handle all aspects of the selling process from market analysis to closing.
+</BusinessInfo>
+Example Conversation Flow:
+Tony: Hi, I'm Tony, a real estate agent. Are you interested in selling your property?
+Client: Yes, I've been thinking about it.
+Tony: That's great! What's the address of the property you're considering selling?
+Client: It's 123 Main Street, Springfield.
+Tony: Perfect! Would you be interested in scheduling a phone call to discuss this further?
+Client: Sure, I'm free tomorrow after 5 PM.
+Tony: <person_told_the_availability>
+<generated_slots>
+["2025-05-24T17:00:00", "2025-05-24T17:30:00", "2025-05-24T18:00:00"]
+</generated_slots>
+<run_function>check_availability</run_function>
+I have availability tomorrow at 5:00 PM, 5:30 PM, or 6:00 PM. Which works best for you?
+
+Input Variables:
+
+{{USER_INPUT}} - The client's message
+Current date: 2025-05-23
+
+Remember: Be conversational, ask one question at a time, and focus on qualifying serious sellers.
+<user_input>
+{{USER_INPUT}}
+</user_input>
+Provide your response in the following format:
+<response>
+[Your conversation with the potential client goes here]
+</response>
+<lead_classification>
+Classification: [Hot/Warm/Junk]
+Reason: [Brief explanation of what information was gathered and lead quality]
+</lead_classification>`;
 
 
-
-const prompt=`Youre name is tony and you are an real estate agent who act as a professional real estate agent. Your primary goal is to engage with potential clients, gather information about their property, and qualify leads. Here's how you should conduct the conversation:
+const prompt1=`Youre name is tony and you are an real estate agent who act as a professional real estate agent. Your primary goal is to engage with potential clients, gather information about their property, and qualify leads. Here's how you should conduct the conversation:
   
   1. Begin each interaction with a friendly greeting and introduce yourself as a real estate agent. and ask whether the perosn in intrested in selling his property
   
@@ -116,7 +236,8 @@ Here is the user's stated availability:
 {{USER_AVAILABILITY}}
 </user_availability>
 <todays_date> 
-2025-05-23
+${new Date().toLocaleDateString('en-CA')}
+
 <todays_date>
 Parse the user's availability and generate an array of time slots based on the following guidelines:
 1. Convert vague time descriptions into specific time slots.
@@ -829,7 +950,20 @@ try{
 
 
 
-     export async function  SendMessageapi(message:any,conversationId:string){
+
+
+
+
+
+
+
+
+
+
+
+
+
+     export async function  SendMessageapi(message:any,conversationId:string,){
 
 
 
@@ -838,13 +972,12 @@ try{
   console.log(message,conversationId)
 
 
-  const conversation:any = await prisma.conversation.findUnique({where:{id:conversationId}});
+  const conversation:any = await prisma.conversation.findUnique({where:{id:conversationId},include:{bot:true,user:true}});
 
-const botid=conversation.buyerbotid || conversation.sellerbotid;
-let prompt:string=''
+const bot=conversation.bot
 
-const bot= await prisma.buyerBot.findUnique({where:{id:botid}})
- prompt=bot.prompt||''
+
+const  prompt=bot.prompt||''
 
 
 
@@ -866,7 +999,7 @@ const bot= await prisma.buyerBot.findUnique({where:{id:botid}})
 
   console.log(message,'message');
 
-  const response= await generateGemniChatResponse({ messages: [ ...(message.map((item)=>{return({ role:item.sender,content:item.text})}))],systemPrompt:prompt})
+  const response= await generateGemniChatResponse({ messages: [ ...(message.map((item)=>{return({ role:item.sender,content:item.content})}))],systemPrompt:prompt,conversation:conversation,user:conversation.user})
 
   
 
@@ -889,6 +1022,1462 @@ console.log(e);
 
 
 
+
+
+
+
+
+
+
+    export async function generateGemniChatResponset(chatRequest: ChatRequest) {
+      
+      
+      console.log(chatRequest,'chat request');
+      
+            try {
+              // Validate the API key
+              if (!process.env.GOOGLE_API_KEY) {
+                throw new Error('Missing Google API key. Please add it to your environment variables.');
+              }
+          
+              // Get the model (Gemini Pro is used for chat)
+ 
+ 
+              //realEstateAgentPromp a tyrp fo prompt
+
+
+              const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:smsScript});
+          
+              // Format the chat history for Gemini API
+              const history = chatRequest.messages.map(msg => ({
+                role:msg.role==='user'?'user':'model', 
+                parts: [{ text: msg.content }],
+              }));
+          
+              // Remove the last user message to send as the prompt
+              
+              const formattedHistory = history
+              const userMessage =  history.pop();
+      
+              // Create a chat session
+              const chat = model.startChat({
+                history: [ ...history]
+                       
+              });
+          
+              // Send the message and get the response
+
+          
+      
+      //check if th reapons of appointment settter
+            const yep=await prisma.testdata.findFirst({where:{name:'tony'}});
+            let response = '';
+
+            if(!yep){
+              
+              
+              const result = await chat.sendMessage(userMessage?.parts[0].text || '');
+              
+               response = result.response.candidates[0].content.parts[0].text;
+               console.log('response',response);
+               
+            }
+      if(response.includes('<run_function>check_availability</run_function>')||function mm(){if(yep){return true}else{return false}}()){
+
+        console.log('control transfered to appointment setter ai ');
+        
+        
+        
+        let user=undefined
+        user=await getuser();
+       if(!user){
+         return {error:'user not found'}
+        }
+        
+        if(!yep){
+
+
+          console.log('prompt created test data');
+          
+          const generatedslots = await extractGeneratedSlots(response.toString())
+         console.log(generatedslots,'generated slots');
+         
+          
+          const token= JSON.parse(user.googlecalendarmetadata)
+          
+          
+          const availabaleSlots=await getAvailableSlots(generatedslots,JSON.parse(user.googlecalendarmetadata))
+          console.log(availabaleSlots,'available slots');
+
+
+
+
+      const offerSlotsPrompt =`You are a real estate agent offering appointment times from available slots.
+
+## Available Time Slots:
+<available_slots>
+${availabaleSlots.map((slot) => `<slot>${slot}</slot>`).join('')}
+</available_slots>
+
+## CRITICAL: ALWAYS START BY OFFERING THE FIRST SLOT
+**No matter what the conversation history shows, you must IMMEDIATELY offer the first available slot from the list above.**
+
+## Your Task:
+1. **Always offer the first available slot first** - don't ask what they prefer
+2. **Be direct and friendly**: "How about [date] at [time]? Does that work for you?"
+3. **Add this tag at the start**: \`<person_told_the_availability>\`
+4. **Wait for client response**
+
+## Client Response Handling:
+
+### If Client Accepts:
+Return \`<selected_slot>[the accepted slot]</selected_slot>\`
+
+### If Client Declines (but doesn't specify other time):
+Offer the next available slot with \`<person_told_the_availability>\` tag
+
+### If All Available Slots Are Declined:
+Return \`<slots_exhausted></slots_exhausted>\`
+
+### If Client Asks for Different/Specific Time:
+**Analyze the client's request carefully:**
+
+- **Client responds to "What time works for you?" question** (First time sharing their preference: "I prefer evenings", "How about 3 PM?", "Tomorrow at 2 PM works")
+→ Continue offering from your available slots with \`<person_told_the_availability>\`
+
+- **Client LATER tries to CHANGE their date preference** during conversation ("Actually, can we do Saturday instead?", "Let's try a different day", "Can we switch to next week?")
+→ Return: \`<generate_new_slots></generate_new_slots>\`
+
+- **Client asks to check other options** ("What other times do you have?", "Any other availability?")
+→ Return: \`<check_availability></check_availability>\`
+
+## IMPORTANT RULES:
+- **NEVER say "Let me find options" or "Let me check" UNLESS the client specifically asks for different times**
+- **ALWAYS offer concrete slots from the available list first**
+- **Only use flags when the client explicitly requests different times or asks to see more options**
+- **Don't assume what the client wants - offer what you have available**
+
+## Response Examples:
+
+### Correct Start (Always do this):
+\`\`\`
+<person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Wrong Start (Never do this):
+\`\`\`
+Perfect! Let me find some weekend options for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Responds to Initial "What time works?" Question:
+\`\`\`
+Agent: "What time and date work best for you?"
+Client: "I prefer evenings"
+Agent: <person_told_the_availability>
+How about August 19th at 6:00 PM? Does that work for you?
+\`\`\`
+
+\`\`\`
+Agent: "What time works for you?"
+Client: "How about tomorrow at 3 PM?"
+Agent: <person_told_the_availability>
+How about August 20th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Client Later Changes Date Preference During Conversation:
+\`\`\`
+[Earlier client said they prefer evenings, AI offered evening slots]
+Client: "Actually, can we do Saturday instead?"
+Agent: Let me check what we have available on Saturday for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+\`\`\`
+[Earlier client wanted specific time, now wants different date]
+Client: "Let's try next week instead"
+Agent: Let me find some options for next week.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Asks for More Options:
+\`\`\`
+Client: "What other times do you have available?"
+Agent: Let me check all our available appointment times for you.
+<check_availability></check_availability>
+\`\`\`
+
+### Normal Decline Flow:
+\`\`\`
+Agent: <person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+
+Client: "No, I can't do that time"
+
+Agent: <person_told_the_availability>
+No problem! How about August 20th at 5:00 PM instead?
+\`\`\`
+
+## Flag Decision Logic:
+- **\`<generate_new_slots>\`**: ONLY when client tries to CHANGE their date preference AFTER they have already responded to the initial "what time works for you?" question. 
+  - **First response to "what time works?"**: Client says "I prefer evenings" or "Tomorrow at 5 PM" → Continue offering from available slots with \`<person_told_the_availability>\`
+  - **Later trying to change date**: After giving initial preference, if client says "Actually, can we do Saturday instead?" → Use \`<generate_new_slots>\`
+- **\`<check_availability>\`**: When client wants to see more options without specifying preferences
+- **\`<selected_slot>\`**: When client accepts an offered time
+- **\`<slots_exhausted>\`**: When all available slots have been declined
+- **\`<person_told_the_availability>\`**: When offering any available slot from your list (including when client first shares their time/date preferences)
+
+## Style:
+- Start immediately with a concrete time offer
+- Keep it friendly and professional
+- Be empathetic when times don't work
+- Stay focused on your available slots first
+- Only generate new options when specifically requested`;
+
+          
+          await prisma.testdata.create({data:{name:'tony',data:offerSlotsPrompt}})
+  console.log('over offering slots');
+      
+    const res= await OfferAvailableSlotst(history,userMessage,offerSlotsPrompt);
+
+
+//check whter the user have slected the date or not
+const input= res.toString()
+
+    const hasOpeningTag = input.includes('<selected_slot>');
+  const hasClosingTag = input.includes('</selected_slot>');
+  const selectedornot= hasOpeningTag && hasClosingTag;
+ return { 
+        success: true, 
+        message:res,
+      }
+
+
+        }
+          
+          
+          
+          
+     
+    // if selected
+
+
+    if(res.includes('<run_function>check_availability</run_function>')||res.includes('<generate_new_slots>')){
+
+
+
+function getTodayDate() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0"); 
+  const dd = String(today.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+
+      const generateSlotsPrompt = `You are a real estate agent generating new appointment time slots based on client availability.
+
+## Your Task:
+Generate specific time slots based on what the client tells you about their availability.
+
+## Today's Date: ${getTodayDate} 
+
+## Client Request Analysis:
+Convert client's availability into specific time slots using ISO 8601 format: \`YYYY-MM-DDTHH:MM:SS\`
+
+## Generation Rules:
+1. **Generate 3-8 specific slots** within their availability window
+2. **Be generous with options** - give multiple times even for specific requests
+3. **Use reasonable business hours** (9 AM - 8 PM unless specified otherwise)
+4. **Space slots reasonably** (every 1-2 hours)
+
+## Time Interpretation Examples:
+- **"tomorrow at 6"** → Generate 6PM, 6:30PM, 7PM tomorrow
+- **"free after 5 PM"** → Generate 5PM, 6PM, 7PM, 8PM today/soon
+- **"weekends"** → Generate Saturday/Sunday morning, afternoon, evening
+- **"next week"** → Generate Mon-Fri various times next week
+- **"Monday morning"** → Generate 9AM, 10AM, 11AM Monday
+- **"evenings this week"** → Generate 6PM, 7PM, 8PM for weekdays
+- **"free Wednesday"** → Generate 10AM, 2PM, 4PM, 6PM Wednesday
+
+## Response Format:
+\`\`\`
+I understand you're looking for [restate their availability]. Let me find some options for you.
+
+<generated_slots>
+[
+  "2025-08-20T18:00:00",
+  "2025-08-20T19:00:00",
+  "2025-08-20T20:00:00",
+  "2025-08-21T18:00:00",
+  "2025-08-21T19:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+## Example Generations:
+
+### Client: "I'm free after 5 PM this week"
+\`\`\`
+Perfect! Let me find some evening options for you this week.
+
+<generated_slots>
+[
+  "2025-08-19T17:00:00",
+  "2025-08-19T18:00:00",
+  "2025-08-19T19:00:00",
+  "2025-08-20T17:00:00",
+  "2025-08-20T18:00:00",
+  "2025-08-21T17:00:00",
+  "2025-08-22T17:00:00",
+  "2025-08-22T18:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+### Client: "Can we do it Saturday morning?"
+\`\`\`
+Absolutely! Let me check what we have available Saturday morning.
+
+<generated_slots>
+[
+  "2025-08-23T09:00:00",
+  "2025-08-23T10:00:00",
+  "2025-08-23T11:00:00",
+  "2025-08-23T12:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+### Client: "I'm busy until next Tuesday, any time after that"
+\`\`\`
+No problem! Let me look at options starting from next Wednesday.
+
+<generated_slots>
+[
+  "2025-08-27T10:00:00",
+  "2025-08-27T14:00:00",
+  "2025-08-27T16:00:00",
+  "2025-08-28T10:00:00",
+  "2025-08-28T14:00:00",
+  "2025-08-29T10:00:00",
+  "2025-08-29T14:00:00",
+  "2025-08-29T16:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+## Style:
+- Acknowledge their availability clearly
+- Be helpful and accommodating
+- Generate realistic, spaced-out options
+- Always end with the function call`
+
+
+
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:generateSlotsPrompt||chatRequest.systemPrompt});
+          
+              // Format the chat history for Gemini API
+              const history = chatRequest.messages.map(msg => ({
+                role:msg.role==='user'?'user':'model',
+                parts: [{ text: msg.content }],
+              }));
+          
+              // Remove the last user message to send as the prompt
+              
+              const formattedHistory = history
+              const userMessage =  history.pop();
+      
+              // Create a chat session
+              const chat = model.startChat({
+                history: [ ...history]
+                       
+              });
+
+
+
+
+
+ const result = await chat.sendMessage(userMessage?.parts[0].text || '');
+ const  response = result.response.candidates[0].content.parts[0].text;
+
+
+
+
+
+
+
+
+
+
+ const generatedslots = await extractGeneratedSlots(response.toString())
+         console.log(generatedslots,'generated slots');
+         
+          
+          const token= JSON.parse(user.googlecalendarmetadata)
+          
+          
+          const availabaleSlots=await getAvailableSlots(generatedslots,JSON.parse(user.googlecalendarmetadata))
+          console.log(availabaleSlots,'available slots');
+
+
+
+
+
+
+
+
+
+
+
+          const newprompt= `You are a real estate agent whose task is to set up appointments with potential clients. You will be provided with an array of available time slots in the following format:
+
+<available_slots>
+${availabaleSlots.map((slot) => `<slot>${slot}</slot>`).join('')}
+</available_slots>
+
+## Control Flags
+
+The system will provide these flags to control your behavior:
+
+\`\`\`
+<flags>
+<offer_available_slots>true</offer_available_slots>
+<generate_new_slots>false</generate_new_slots>
+<slots_available>true</slots_available>
+</flags>
+\`\`\`
+
+### Flag Meanings:
+- **offer_available_slots**: When \`true\`, offer from existing available slots
+- **generate_new_slots**: When \`true\`, generate new slots based on client preferences
+- **slots_available**: When \`true\`, there are slots in the available_slots array to offer
+
+## Primary Task: Offer Available Slots
+
+**Only when \`<offer_available_slots>true</offer_available_slots>\` and \`<slots_available>true</slots_available>\`:**
+
+1. **Start with the first available slot** in the array
+2. **Offer this slot** to the client in a friendly, conversational manner
+   - Example: "How about [date] at [time]? Does that work for you?"
+3. **Add this tag at the top of each response**: \`<person_told_the_availability>\`
+4. **Wait for client response** in format:
+   \`\`\`
+   <user_response>
+   {{USER_RESPONSE}}
+   </user_response>
+   \`\`\`
+
+5. **If client accepts**: Stop offering and return \`<selected_slot>[selected date and time]</selected_slot>\`
+6. **If client declines**: Move to next slot and repeat
+7. **If all slots declined**: Return \`<slots_exhausted></slots_exhausted>\`
+
+## Secondary Task: Handle Custom Time Requests
+
+**Only when \`<generate_new_slots>true</generate_new_slots>\`:**
+
+When the client requests a different time (not in available slots), generate new slots based on their availability.
+
+### Slot Generation Rules:
+1. Convert vague descriptions into specific time slots
+2. Use ISO 8601 format: \`YYYY-MM-DDTHH:MM:SS\`
+3. Generate 1-10 slots (as many as possible within constraints)
+4. Use today's date as reference: **2025-08-19** (Tuesday)
+5. Generate multiple slots even for specific dates
+
+### Examples:
+- "free after 5" → Generate slots at 5PM, 6PM, 7PM, etc.
+- "free on weekends" → Generate Saturday/Sunday slots
+- "free tomorrow after 4" → Generate slots from 4PM onwards tomorrow
+- "free next week" → Generate various slots throughout next week
+
+### Response Format for Custom Requests:
+\`\`\`
+<generated_slots>
+[
+  "2025-08-19T17:00:00",
+  "2025-08-19T18:00:00",
+  "2025-08-19T19:00:00",
+  "2025-08-20T17:00:00",
+  "2025-08-20T18:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+After this response, the system will programmatically update available slots and you can continue offering them.
+
+## Behavior Based on Flags
+
+### Scenario 1: \`offer_available_slots=true\`, \`slots_available=true\`
+- Offer the first available slot from the array
+- Use \`<person_told_the_availability>\` tag
+
+### Scenario 2: \`offer_available_slots=false\`, \`slots_available=false\`
+- Don't offer any slots
+- Wait for client to specify their availability
+- Acknowledge that you need to check available times
+
+### Scenario 3: \`generate_new_slots=true\`
+- Generate new slots based on client's stated preferences
+- Use the slot generation format above
+
+### Scenario 4: \`offer_available_slots=false\`, \`generate_new_slots=false\`
+- Acknowledge the client's response
+- Ask clarifying questions about their availability
+- Prepare to either offer available slots or generate new ones based on their response
+
+## Communication Style:
+- Keep interactions **friendly, concise, and human-like**
+- Be conversational and professional
+- Show empathy when slots don't work
+- Stay positive and solution-focused
+
+## Example Interactions:
+
+**Standard Flow (offer_available_slots=true, slots_available=true):**
+\`\`\`
+Flags: <offer_available_slots>true</offer_available_slots>, <slots_available>true</slots_available>
+
+Agent: <person_told_the_availability>
+How about August 19th at 5:00 PM? Does that work for you?
+
+Client: No, sorry, I'm busy then.
+
+Agent: <person_told_the_availability>
+No problem! Let's try another option. Would August 20th at 5:00 PM suit you better?
+
+Client: Yes, that works perfectly!
+
+Agent: <selected_slot>2025-08-20T17:00:00</selected_slot>
+\`\`\`
+
+**Custom Time Request (generate_new_slots=true):**
+\`\`\`
+Flags: <generate_new_slots>true</generate_new_slots>
+
+Agent: I understand! Let me check what we have available after 7 PM this week.
+
+<generated_slots>
+[
+  "2025-08-19T19:00:00",
+  "2025-08-19T20:00:00",
+  "2025-08-20T19:00:00",
+  "2025-08-20T20:00:00",
+  "2025-08-21T19:00:00",
+  "2025-08-21T20:00:00",
+  "2025-08-22T19:00:00",
+  "2025-08-22T20:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+**Waiting Mode (offer_available_slots=false, generate_new_slots=false):**
+\`\`\`
+Flags: <offer_available_slots>false</offer_available_slots>, <generate_new_slots>false</generate_new_slots>
+
+Agent: I'd be happy to help you schedule an appointment! When would be the best time for you? Are there any particular days or times that work better for your schedule?
+\`\`\`
+
+## Key Rules:
+1. **Always check flags first** before deciding what action to take
+2. **Only offer available slots** when \`offer_available_slots=true\`
+3. **Only generate new slots** when \`generate_new_slots=true\`
+4. **Use appropriate tags** based on the current mode
+5. **Maintain conversational flow** while respecting flag constraints`;
+
+// Usage in your code:
+// const prompt = realEstateAgentPrompt;`
+
+          await prisma.testdata.updateMany({where:{name:'tony'},data:{data:newprompt}})
+ const res= await OfferAvailableSlotst(history,userMessage);
+return { 
+        success: true, 
+        message:res,
+      }
+
+
+
+    }
+  if(selectedornot){
+
+const match = input.match(/<selected_slot>([\s\S]*?)<\/selected_slot>/);
+  const selectedate= match ? match[1].trim() : null;
+console.log(selectedate,'selected date');
+const booked= await bookSlot(selectedate,'test','test',JSON.parse(user.googlecalendarmetadata))
+
+console.log(booked,'booked');
+
+
+
+  }
+      
+    console.log(res,'rest'); 
+       // Return the Gemini response
+       return { 
+        success: true, 
+        message:res,
+      }
+    
+      }else{
+
+        
+
+
+               return { 
+                success: true, 
+                message: extractResponse(response) || response?.split('</response>')[0] || 'No response generated',
+              };
+      }
+      
+      
+      // check if the response contains <run_function>check_availability</run_function>
+      //
+      
+      
+      
+        
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+              // Return the Gemini response
+             
+            } catch (error: any) {
+              console.error('Error generating chat response:', error);
+              return { 
+                success: false, 
+                error: error.message || 'Failed to generate response' 
+              };
+            }
+          }
+
+
+
+          export async function OfferAvailableSlotst(history: any[],userMessage:any,testchatid) {
+      
+            const offerappointmentpropmt=await prisma.testdata.findFirst({where:{id:testchatid}})
+
+            console.log(offerappointmentpropmt.data,'offer appointment propmt');
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:offerappointmentpropmt.data});
+           console.log(offerappointmentpropmt,'offer appointment propmt');
+           
+            const chat = model.startChat({
+    
+                history: [...history] ,
+                       
+              });
+              
+              console.log(history,'user message');
+            const result = await chat.sendMessage(userMessage?.parts[0].text || '');
+            const response = result.response.candidates[0].content.parts[0].text;
+            console.log(response,' comminf g from offer available slots')
+   
+      return response
+        }
+
+
+
+
+
+
+
+function getTodayDate() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+
+
+      const generateSlotsPrompt = `You are a real estate agent generating new appointment time slots based on client availability.
+
+## Your Task:
+Generate specific time slots based on what the client tells you about their availability.
+
+## Today's Date: ${getTodayDate} (Tuesday)
+
+## Client Request Analysis:
+Convert client's availability into specific time slots using ISO 8601 format: \`YYYY-MM-DDTHH:MM:SS\`
+
+## Generation Rules:
+1. **Generate 3-8 specific slots** within their availability window
+2. **Be generous with options** - give multiple times even for specific requests
+3. **Use reasonable business hours** (9 AM - 8 PM unless specified otherwise)
+4. **Space slots reasonably** (every 1-2 hours)
+
+## Time Interpretation Examples:
+- **"tomorrow at 6"** → Generate 6PM, 6:30PM, 7PM tomorrow
+- **"free after 5 PM"** → Generate 5PM, 6PM, 7PM, 8PM today/soon
+- **"weekends"** → Generate Saturday/Sunday morning, afternoon, evening
+- **"next week"** → Generate Mon-Fri various times next week
+- **"Monday morning"** → Generate 9AM, 10AM, 11AM Monday
+- **"evenings this week"** → Generate 6PM, 7PM, 8PM for weekdays
+- **"free Wednesday"** → Generate 10AM, 2PM, 4PM, 6PM Wednesday
+
+## Response Format:
+\`\`\`
+I understand you're looking for [restate their availability]. Let me find some options for you.
+
+<generated_slots>
+[
+  "2025-08-20T18:00:00",
+  "2025-08-20T19:00:00",
+  "2025-08-20T20:00:00",
+  "2025-08-21T18:00:00",
+  "2025-08-21T19:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+## Example Generations:
+
+### Client: "I'm free after 5 PM this week"
+\`\`\`
+Perfect! Let me find some evening options for you this week.
+
+<generated_slots>
+[
+  "2025-08-19T17:00:00",
+  "2025-08-19T18:00:00",
+  "2025-08-19T19:00:00",
+  "2025-08-20T17:00:00",
+  "2025-08-20T18:00:00",
+  "2025-08-21T17:00:00",
+  "2025-08-22T17:00:00",
+  "2025-08-22T18:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+### Client: "Can we do it Saturday morning?"
+\`\`\`
+Absolutely! Let me check what we have available Saturday morning.
+
+<generated_slots>
+[
+  "2025-08-23T09:00:00",
+  "2025-08-23T10:00:00",
+  "2025-08-23T11:00:00",
+  "2025-08-23T12:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+### Client: "I'm busy until next Tuesday, any time after that"
+\`\`\`
+No problem! Let me look at options starting from next Wednesday.
+
+<generated_slots>
+[
+  "2025-08-27T10:00:00",
+  "2025-08-27T14:00:00",
+  "2025-08-27T16:00:00",
+  "2025-08-28T10:00:00",
+  "2025-08-28T14:00:00",
+  "2025-08-29T10:00:00",
+  "2025-08-29T14:00:00",
+  "2025-08-29T16:00:00"
+]
+</generated_slots>
+
+<run_function>check_availability</run_function>
+\`\`\`
+
+## Style:
+- Acknowledge their availability clearly
+- Be helpful and accommodating
+- Generate realistic, spaced-out options
+- Always end with the function call`
+
+
+
+
+
+        export  async function airesponseapifortesting(chatRequest: ChatRequest,testchatid){
+
+   const history = chatRequest.messages.map(msg => ({
+                role:msg.role==='user'?'user':'model',
+                parts: [{ text: msg.content }],
+              }));
+
+
+ const formattedHistory = history
+              const userMessage =  history.pop();
+ if (!process.env.GOOGLE_API_KEY) {
+                throw new Error('Missing Google API key. Please add it to your environment variables.');
+              }
+
+
+
+              const data= await prisma.testdata.findFirst({where:{id:testchatid}})
+
+
+
+              let response = ''
+              //first type of mesag handele simpel uestion awnser
+              if(data.status='TALKING'){
+
+                const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:smsScript||chatRequest.systemPrompt});
+           
+               // Format the chat history for Gemini API
+            
+       
+               // Create a chat session
+               const chat = model.startChat({
+                 history: [ ...history]
+                        
+               });
+
+
+                const resu = await chat.sendMessage(userMessage?.parts[0].text || '');
+              
+               response = resu.response.candidates[0].content.parts[0].text;
+               console.log('response',response);
+               
+
+               
+               if(!response.includes('<run_function>check_availability</run_function>')){
+                 
+                return {
+                  success:true,
+                  message:response
+                }
+                 
+               }
+                 //first type of mesag handele simpel uestion awnser
+              
+              
+               if(response.includes('<run_function>check_availability</run_function>')){
+                
+                
+                const generatedslots = await extractGeneratedSlots(response.toString())
+                console.log(generatedslots,'generated slots');
+                
+                const user= await getuser();
+                const token= JSON.parse(user.googlecalendarmetadata)
+                
+                
+                const availabaleSlots=await getAvailableSlots(generatedslots,JSON.parse(user.googlecalendarmetadata))
+                console.log(availabaleSlots,'available slots');
+                
+                const offerSlotsPrompt =`You are a real estate agent offering appointment times from available slots.
+
+## Available Time Slots:
+<available_slots>
+${availabaleSlots.map((slot) => `<slot>${slot}</slot>`).join('')}
+</available_slots>
+
+## CRITICAL: ALWAYS START BY OFFERING THE FIRST SLOT
+**No matter what the conversation history shows, you must IMMEDIATELY offer the first available slot from the list above.**
+
+## Your Task:
+1. **Always offer the first available slot first** - don't ask what they prefer
+2. **Be direct and friendly**: "How about [date] at [time]? Does that work for you?"
+3. **Add this tag at the start**: \`<person_told_the_availability>\`
+4. **Wait for client response**
+
+## Client Response Handling:
+
+### If Client Accepts:
+Return \`<selected_slot>[the accepted slot]</selected_slot>\`
+
+### If Client Declines (but doesn't specify other time):
+Offer the next available slot with \`<person_told_the_availability>\` tag
+
+### If All Available Slots Are Declined:
+Return \`<slots_exhausted></slots_exhausted>\`
+
+### If Client Asks for Different/Specific Time:
+**Analyze the client's request carefully:**
+
+- **Client responds to "What time works for you?" question** (First time sharing their preference: "I prefer evenings", "How about 3 PM?", "Tomorrow at 2 PM works")
+→ Continue offering from your available slots with \`<person_told_the_availability>\`
+
+- **Client LATER tries to CHANGE their date preference** during conversation ("Actually, can we do Saturday instead?", "Let's try a different day", "Can we switch to next week?")
+→ Return: \`<generate_new_slots></generate_new_slots>\`
+
+- **Client asks to check other options** ("What other times do you have?", "Any other availability?")
+→ Return: \`<check_availability></check_availability>\`
+
+## IMPORTANT RULES:
+- **NEVER say "Let me find options" or "Let me check" UNLESS the client specifically asks for different times**
+- **ALWAYS offer concrete slots from the available list first**
+- **Only use flags when the client explicitly requests different times or asks to see more options**
+- **Don't assume what the client wants - offer what you have available**
+
+## Response Examples:
+
+### Correct Start (Always do this):
+\`\`\`
+<person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Wrong Start (Never do this):
+\`\`\`
+Perfect! Let me find some weekend options for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Responds to Initial "What time works?" Question:
+\`\`\`
+Agent: "What time and date work best for you?"
+Client: "I prefer evenings"
+Agent: <person_told_the_availability>
+How about August 19th at 6:00 PM? Does that work for you?
+\`\`\`
+
+\`\`\`
+Agent: "What time works for you?"
+Client: "How about tomorrow at 3 PM?"
+Agent: <person_told_the_availability>
+How about August 20th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Client Later Changes Date Preference During Conversation:
+\`\`\`
+[Earlier client said they prefer evenings, AI offered evening slots]
+Client: "Actually, can we do Saturday instead?"
+Agent: Let me check what we have available on Saturday for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+\`\`\`
+[Earlier client wanted specific time, now wants different date]
+Client: "Let's try next week instead"
+Agent: Let me find some options for next week.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Asks for More Options:
+\`\`\`
+Client: "What other times do you have available?"
+Agent: Let me check all our available appointment times for you.
+<check_availability></check_availability>
+\`\`\`
+
+### Normal Decline Flow:
+\`\`\`
+Agent: <person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+
+Client: "No, I can't do that time"
+
+Agent: <person_told_the_availability>
+No problem! How about August 20th at 5:00 PM instead?
+\`\`\`
+
+## Flag Decision Logic:
+- **\`<generate_new_slots>\`**: ONLY when client tries to CHANGE their date preference AFTER they have already responded to the initial "what time works for you?" question. 
+  - **First response to "what time works?"**: Client says "I prefer evenings" or "Tomorrow at 5 PM" → Continue offering from available slots with \`<person_told_the_availability>\`
+  - **Later trying to change date**: After giving initial preference, if client says "Actually, can we do Saturday instead?" → Use \`<generate_new_slots>\`
+- **\`<check_availability>\`**: When client wants to see more options without specifying preferences
+- **\`<selected_slot>\`**: When client accepts an offered time
+- **\`<slots_exhausted>\`**: When all available slots have been declined
+- **\`<person_told_the_availability>\`**: When offering any available slot from your list (including when client first shares their time/date preferences)
+
+## Style:
+- Start immediately with a concrete time offer
+- Keep it friendly and professional
+- Be empathetic when times don't work
+- Stay focused on your available slots first
+- Only generate new options when specifically requested`;
+console.log(offerSlotsPrompt,'offer slots prompt');
+
+            const rest=    await prisma.testdata.update({where:{id:testchatid},data:{data:offerSlotsPrompt,status:'APPOINTMENTSETTING'}})
+            console.log(rest,'rest');
+                const res= await OfferAvailableSlotst(history,userMessage,testchatid);
+                
+                 return{
+    success:true,
+    message:res
+  }
+              }
+
+
+
+
+
+
+
+          
+
+   const result = await chat.sendMessage(userMessage?.parts[0].text || '');
+              
+               response = result.response.candidates[0].content.parts[0].text;
+
+
+
+                 const generatedslots = await extractGeneratedSlots(response.toString())
+         console.log(generatedslots,'generated slots');
+         
+         const user= getuser();
+          
+          const token= JSON.parse(user.googlecalendarmetadata)
+          
+          
+          const availabaleSlots=await getAvailableSlots(generatedslots,JSON.parse(user.googlecalendarmetadata))
+          console.log(availabaleSlots,'available slots');
+
+      const offerSlotsPrompt =`You are a real estate agent offering appointment times from available slots.
+
+## Available Time Slots:
+<available_slots>
+${availabaleSlots.map((slot) => `<slot>${slot}</slot>`).join('')}
+</available_slots>
+
+## CRITICAL: ALWAYS START BY OFFERING THE FIRST SLOT
+**No matter what the conversation history shows, you must IMMEDIATELY offer the first available slot from the list above.**
+
+## Your Task:
+1. **Always offer the first available slot first** - don't ask what they prefer
+2. **Be direct and friendly**: "How about [date] at [time]? Does that work for you?"
+3. **Add this tag at the start**: \`<person_told_the_availability>\`
+4. **Wait for client response**
+
+## Client Response Handling:
+
+### If Client Accepts:
+Return \`<selected_slot>[the accepted slot]</selected_slot>\`
+
+### If Client Declines (but doesn't specify other time):
+Offer the next available slot with \`<person_told_the_availability>\` tag
+
+### If All Available Slots Are Declined:
+Return \`<slots_exhausted></slots_exhausted>\`
+
+### If Client Asks for Different/Specific Time:
+**Analyze the client's request carefully:**
+
+- **Client responds to "What time works for you?" question** (First time sharing their preference: "I prefer evenings", "How about 3 PM?", "Tomorrow at 2 PM works")
+→ Continue offering from your available slots with \`<person_told_the_availability>\`
+
+- **Client LATER tries to CHANGE their date preference** during conversation ("Actually, can we do Saturday instead?", "Let's try a different day", "Can we switch to next week?")
+→ Return: \`<generate_new_slots></generate_new_slots>\`
+
+- **Client asks to check other options** ("What other times do you have?", "Any other availability?")
+→ Return: \`<check_availability></check_availability>\`
+
+## IMPORTANT RULES:
+- **NEVER say "Let me find options" or "Let me check" UNLESS the client specifically asks for different times**
+- **ALWAYS offer concrete slots from the available list first**
+- **Only use flags when the client explicitly requests different times or asks to see more options**
+- **Don't assume what the client wants - offer what you have available**
+
+## Response Examples:
+
+### Correct Start (Always do this):
+\`\`\`
+<person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Wrong Start (Never do this):
+\`\`\`
+Perfect! Let me find some weekend options for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Responds to Initial "What time works?" Question:
+\`\`\`
+Agent: "What time and date work best for you?"
+Client: "I prefer evenings"
+Agent: <person_told_the_availability>
+How about August 19th at 6:00 PM? Does that work for you?
+\`\`\`
+
+\`\`\`
+Agent: "What time works for you?"
+Client: "How about tomorrow at 3 PM?"
+Agent: <person_told_the_availability>
+How about August 20th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Client Later Changes Date Preference During Conversation:
+\`\`\`
+[Earlier client said they prefer evenings, AI offered evening slots]
+Client: "Actually, can we do Saturday instead?"
+Agent: Let me check what we have available on Saturday for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+\`\`\`
+[Earlier client wanted specific time, now wants different date]
+Client: "Let's try next week instead"
+Agent: Let me find some options for next week.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Asks for More Options:
+\`\`\`
+Client: "What other times do you have available?"
+Agent: Let me check all our available appointment times for you.
+<check_availability></check_availability>
+\`\`\`
+
+### Normal Decline Flow:
+\`\`\`
+Agent: <person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+
+Client: "No, I can't do that time"
+
+Agent: <person_told_the_availability>
+No problem! How about August 20th at 5:00 PM instead?
+\`\`\`
+
+## Flag Decision Logic:
+- **\`<generate_new_slots>\`**: ONLY when client tries to CHANGE their date preference AFTER they have already responded to the initial "what time works for you?" question. 
+  - **First response to "what time works?"**: Client says "I prefer evenings" or "Tomorrow at 5 PM" → Continue offering from available slots with \`<person_told_the_availability>\`
+  - **Later trying to change date**: After giving initial preference, if client says "Actually, can we do Saturday instead?" → Use \`<generate_new_slots>\`
+- **\`<check_availability>\`**: When client wants to see more options without specifying preferences
+- **\`<selected_slot>\`**: When client accepts an offered time
+- **\`<slots_exhausted>\`**: When all available slots have been declined
+- **\`<person_told_the_availability>\`**: When offering any available slot from your list (including when client first shares their time/date preferences)
+
+## Style:
+- Start immediately with a concrete time offer
+- Keep it friendly and professional
+- Be empathetic when times don't work
+- Stay focused on your available slots first
+- Only generate new options when specifically requested`;
+
+
+
+console.log(offerSlotsPrompt,'offer slots prompt without db update');
+const rest=await prisma.testdata.update({where:{id:testchatid},data:{status:'APPOINTMENTSETTING',data:offerSlotsPrompt}})
+console.log(rest,'rest after update');
+const res= await OfferAvailableSlotst(history,userMessage,offerSlotsPrompt);
+ return{
+  sucess:true,
+  message:res
+ }
+
+
+}
+
+
+//firts time slots generation and offering
+
+
+
+
+if(data.status='APPOINTMENTSETTING'){
+
+   // Get the model (Gemini Pro is used for chat)
+
+
+      const offerappointmentpropmt=await prisma.testdata.findFirst({where:{id:testchatid}})
+              const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:offerappointmentpropmt.data||chatRequest.systemPrompt});
+          
+              // Format the chat history for Gemini API
+              const history = chatRequest.messages.map(msg => ({
+                role:msg.role==='user'?'user':'model',
+                parts: [{ text: msg.content }],
+              }));
+          
+              // Remove the last user message to send as the prompt
+              
+              const formattedHistory = history
+              const userMessage =  history.pop();
+      
+              // Create a chat session
+              const chat = model.startChat({
+                history: [ ...history]
+                       
+              });
+          
+              const result = await chat.sendMessage(userMessage?.parts[0].text || '');
+              
+               response = result.response.candidates[0].content.parts[0].text;
+               console.log('response',response);
+
+
+
+             
+
+
+
+if(!response.includes('<run_function>check_availability</run_function>')||!response.includes('<generated_slots>')){
+
+
+
+  return{
+    message:response,
+    success:true
+  }
+
+
+}
+
+if(response.includes('<run_function>check_availability</run_function>')||response.includes('<generated_slots>')){
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:generateSlotsPrompt||chatRequest.systemPrompt});
+          
+              // Format the chat history for Gemini API
+              const history = chatRequest.messages.map(msg => ({
+                role:msg.role==='user'?'user':'model',
+                parts: [{ text: msg.content }],
+              }));
+          
+              // Remove the last user message to send as the prompt
+              
+              const formattedHistory = history
+              const userMessage =  history.pop();
+      
+              // Create a chat session
+              const chat = model.startChat({
+                history: [ ...history]
+                       
+              });
+          
+              const result = await chat.sendMessage(userMessage?.parts[0].text || '');
+              
+               response = result.response.candidates[0].content.parts[0].text;
+               console.log('response',response);
+
+
+                 let user=undefined
+        user=await getuser();
+       if(!user){
+         return {error:'user not found'}
+        }
+        
+        
+
+
+          console.log('prompt created test data');
+          
+          const generatedslots = await extractGeneratedSlots(response.toString())
+         console.log(generatedslots,'generated slots');
+         
+          
+          const token= JSON.parse(user.googlecalendarmetadata)
+          
+          
+          const availabaleSlots=await getAvailableSlots(generatedslots,JSON.parse(user.googlecalendarmetadata))
+          console.log(availabaleSlots,'available slots');
+
+               const offerSlotsPrompt =`You are a real estate agent offering appointment times from available slots.
+
+## Available Time Slots:
+<available_slots>
+${availabaleSlots.map((slot) => `<slot>${slot}</slot>`).join('')}
+</available_slots>
+
+## CRITICAL: ALWAYS START BY OFFERING THE FIRST SLOT
+**No matter what the conversation history shows, you must IMMEDIATELY offer the first available slot from the list above.**
+
+## Your Task:
+1. **Always offer the first available slot first** - don't ask what they prefer
+2. **Be direct and friendly**: "How about [date] at [time]? Does that work for you?"
+3. **Add this tag at the start**: \`<person_told_the_availability>\`
+4. **Wait for client response**
+
+## Client Response Handling:
+
+### If Client Accepts:
+Return \`<selected_slot>[the accepted slot]</selected_slot>\`
+
+### If Client Declines (but doesn't specify other time):
+Offer the next available slot with \`<person_told_the_availability>\` tag
+
+### If All Available Slots Are Declined:
+Return \`<slots_exhausted></slots_exhausted>\`
+
+### If Client Asks for Different/Specific Time:
+**Analyze the client's request carefully:**
+
+- **Client responds to "What time works for you?" question** (First time sharing their preference: "I prefer evenings", "How about 3 PM?", "Tomorrow at 2 PM works")
+→ Continue offering from your available slots with \`<person_told_the_availability>\`
+
+- **Client LATER tries to CHANGE their date preference** during conversation ("Actually, can we do Saturday instead?", "Let's try a different day", "Can we switch to next week?")
+→ Return: \`<generate_new_slots></generate_new_slots>\`
+
+- **Client asks to check other options** ("What other times do you have?", "Any other availability?")
+→ Return: \`<check_availability></check_availability>\`
+
+## IMPORTANT RULES:
+- **NEVER say "Let me find options" or "Let me check" UNLESS the client specifically asks for different times**
+- **ALWAYS offer concrete slots from the available list first**
+- **Only use flags when the client explicitly requests different times or asks to see more options**
+- **Don't assume what the client wants - offer what you have available**
+
+## Response Examples:
+
+### Correct Start (Always do this):
+\`\`\`
+<person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Wrong Start (Never do this):
+\`\`\`
+Perfect! Let me find some weekend options for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Responds to Initial "What time works?" Question:
+\`\`\`
+Agent: "What time and date work best for you?"
+Client: "I prefer evenings"
+Agent: <person_told_the_availability>
+How about August 19th at 6:00 PM? Does that work for you?
+\`\`\`
+
+\`\`\`
+Agent: "What time works for you?"
+Client: "How about tomorrow at 3 PM?"
+Agent: <person_told_the_availability>
+How about August 20th at 3:00 PM? Does that work for you?
+\`\`\`
+
+### Client Later Changes Date Preference During Conversation:
+\`\`\`
+[Earlier client said they prefer evenings, AI offered evening slots]
+Client: "Actually, can we do Saturday instead?"
+Agent: Let me check what we have available on Saturday for you.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+\`\`\`
+[Earlier client wanted specific time, now wants different date]
+Client: "Let's try next week instead"
+Agent: Let me find some options for next week.
+<generate_new_slots></generate_new_slots>
+\`\`\`
+
+### Client Asks for More Options:
+\`\`\`
+Client: "What other times do you have available?"
+Agent: Let me check all our available appointment times for you.
+<check_availability></check_availability>
+\`\`\`
+
+### Normal Decline Flow:
+\`\`\`
+Agent: <person_told_the_availability>
+How about August 19th at 3:00 PM? Does that work for you?
+
+Client: "No, I can't do that time"
+
+Agent: <person_told_the_availability>
+No problem! How about August 20th at 5:00 PM instead?
+\`\`\`
+
+## Flag Decision Logic:
+- **\`<generate_new_slots>\`**: ONLY when client tries to CHANGE their date preference AFTER they have already responded to the initial "what time works for you?" question. 
+  - **First response to "what time works?"**: Client says "I prefer evenings" or "Tomorrow at 5 PM" → Continue offering from available slots with \`<person_told_the_availability>\`
+  - **Later trying to change date**: After giving initial preference, if client says "Actually, can we do Saturday instead?" → Use \`<generate_new_slots>\`
+- **\`<check_availability>\`**: When client wants to see more options without specifying preferences
+- **\`<selected_slot>\`**: When client accepts an offered time
+- **\`<slots_exhausted>\`**: When all available slots have been declined
+- **\`<person_told_the_availability>\`**: When offering any available slot from your list (including when client first shares their time/date preferences)
+
+## Style:
+- Start immediately with a concrete time offer
+- Keep it friendly and professional
+- Be empathetic when times don't work
+- Stay focused on your available slots first
+- Only generate new options when specifically requested`;
+
+             
+const rest=await prisma.testdata.update({where:{id:testchatid},data:{status:'APPOINTMENTSETTING',data:offerSlotsPrompt}})
+console.log(rest,'rest after update');
+
+const res= await OfferAvailableSlotst(history,userMessage,testchatid);
+return{
+  success:true,
+  message:res
+}
+
+
+
+}
+
+
+
+return {
+  success:true,
+  message:response
+}
+
+
+
+}
+
+
+
+            }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      
+      
+
+
+
+
+
+
     export async function  SendMessage(message:any,testchatid:string){
 
 
@@ -898,13 +2487,13 @@ try{
   console.log(message,testchatid)
 
 
-  const testchat:any = await prisma.testchat.findUnique({where:{id:testchatid}});
+  const testchat:any = await prisma.testdata.findUnique({where:{id:testchatid}});
 
 const botid=testchat.botid;
-let prompt:string=''
+const prompt=realEstateAgentPrompt
 
-const bot= await prisma.Bot.findUnique({where:{id:botid}})
- prompt=bot.prompt||''
+const bot= await prisma.bot.findUnique({where:{id:botid}})
+
 
 
 
@@ -926,7 +2515,8 @@ const bot= await prisma.Bot.findUnique({where:{id:botid}})
 
   console.log(message,'message');
 
-  const response= await generateGemniChatResponse({ messages: [ ...(message.map((item)=>{return({ role:item.sender,content:item.text})}))],systemPrompt:prompt})
+
+  const response= await airesponseapifortesting({ messages: [ ...(message.map((item)=>{return({ role:item.sender,content:item.text})}))],systemPrompt:prompt},testchatid)
 
   
 
@@ -973,6 +2563,8 @@ console.log(e);
     export interface ChatRequest {
       messages: Message[];
       systemPrompt?: string;
+      conversation: any
+      user:any
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
@@ -995,6 +2587,7 @@ console.log(e);
       
       
       console.log(chatRequest,'chat request');
+      const{conversation,user}=chatRequest
       
             try {
               // Validate the API key
@@ -1003,11 +2596,12 @@ console.log(e);
               }
           
               // Get the model (Gemini Pro is used for chat)
-              const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:prompt||chatRequest.systemPrompt});
+
+              const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:smsScript});
           
               // Format the chat history for Gemini API
               const history = chatRequest.messages.map(msg => ({
-                role:msg.role==='user'?'user':'model',
+                role:msg.role==='LEAD'?'user':'model',
                 parts: [{ text: msg.content }],
               }));
           
@@ -1018,7 +2612,7 @@ console.log(e);
       
               // Create a chat session
               const chat = model.startChat({
-                history: [ ...history]
+                history: [{role:'user',parts:[{text:'start'}]}, ...history]
                        
               });
           
@@ -1027,28 +2621,25 @@ console.log(e);
           
       
       //check if th reapons of appointment settter
-            const yep=await prisma.testdata.findFirst({where:{name:'tony'}});
+            const yep=conversation.status
+       
             let response = '';
-            if(!yep){
+            if(yep==='TALKING'){
               
-              
+              console.log('reached inside 1')
               const result = await chat.sendMessage(userMessage?.parts[0].text || '');
               
                response = result.response.candidates[0].content.parts[0].text;
+               console.log(response,'arer ter sale resonse slele')
             }
-      if(response.includes('<run_function>check_availability</run_function>')||function mm(){if(yep){return true}else{return false}}()){
+                                                                                        
+      if(response.includes('<run_function>check_availability</run_function>')|| (yep==='APPOINTMENTSETTING') ){
 
         console.log('control transfered to appointment setter ai ');
         
         
-        
-        let user=undefined
-        user=await getuser();
-       if(!user){
-         return {error:'user not found'}
-        }
-        
-        if(!yep){
+
+        if((yep==='TALKING')){
 
 
           console.log('prompt created test data');
@@ -1152,7 +2743,7 @@ After generating the time slots, indicate that it's time to run the backend func
           
           Please proceed with offering the available slots one by one, starting with the first slot in the array.`
           
-          await prisma.testdata.create({data:{name:'tony',data:prompte}})
+          await prisma.conversation.update({where:{id:conversation.id},data:{status:'APPOINTMENTSETTING',appointmentdataprompt:prompte}})
 
 
 
@@ -1163,7 +2754,7 @@ After generating the time slots, indicate that it's time to run the backend func
           
        console.log('over offering slots');
       
-    const res= await OfferAvailableSlots(history,userMessage);
+    const res= await OfferAvailableSlots(history,userMessage,conversation.id);
 
 //check whter the user have slected the date or not
 const input= res.toString()
@@ -1193,8 +2784,11 @@ console.log(booked,'booked');
     
       }else{
 
-        
-
+        console.log(response,'response')
+console.log( { 
+                success: true, 
+                message: extractResponse(response) || response?.split('</response>')[0] || 'No response generated',
+              })
 
                return { 
                 success: true, 
@@ -1271,17 +2865,18 @@ console.log(booked,'booked');
 
 
 
-          export async function OfferAvailableSlots(history: any[],userMessage:any) {
+          export async function OfferAvailableSlots(history: any[],userMessage:any, conversationid) {
       
-            const offerappointmentpropmt=await prisma.testdata.findFirst({where:{name:'tony'}})
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:offerappointmentpropmt.data});
+            const offerappointmentpropmt=await prisma.conversation.findFirst({where:{id:conversationid}})
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:offerappointmentpropmt.appointmentdataprompt});
            console.log(offerappointmentpropmt,'offer appointment propmt');
-           
+          
+           console.log(history)
             const chat = model.startChat({
-    
-                history: [...history] ,
+                history: [{role:'user',parts:[{text:'start'}]}, ...history]
                        
               });
+          
               
               console.log(history,'user message');
             const result = await chat.sendMessage(userMessage?.parts[0].text || '');
@@ -1457,8 +3052,23 @@ return {success:true}
 console.log(e)
         return {error:'something wrong'}
       }
+      
 
 
 
     }
 
+
+
+
+
+
+
+
+    export async function testchat(ids:string){
+      console.log(ids,'ids')
+
+const {id} = await prisma.testdata.create({data:{name:'dcwdc',botid:ids}})
+
+return id
+    }

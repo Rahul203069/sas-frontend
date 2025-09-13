@@ -159,11 +159,18 @@ enum ContactType {
   PHONE
 }
 
+enum  ConversationStatus {
+  TALKING
+  APPOINTMENTSETTING
+}
+
 model Conversation {
   id          String   @id @default(uuid())  
   leadId      String   
   userId      String
   type        bottype?     
+status ConversationStatus @default(TALKING)
+appointmentdataprompt     String?      
 
 botId      String
   bot         Bot? @relation(fields: [botId], references: [id])
@@ -174,7 +181,7 @@ botId      String
   updatedAt   DateTime  @updatedAt
 
   lead        Lead      @relation(fields: [leadId], references: [id])
-  user        User?    @relation(fields: [userId], references: [id])
+  user        User    @relation(fields: [userId], references: [id])
   chatSession ChatSession?
 }
 
@@ -254,6 +261,8 @@ suggestedslots Json?
 
   model testdata{
   id String @id @default(uuid())
+status ConversationStatus @default(TALKING)
+botid   String?
   data String?
   name String?
   }

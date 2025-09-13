@@ -1,6 +1,6 @@
 //@ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { SendMessage } from '@/app/action';
+import { SendMessage, SendMessageapi } from '@/app/action';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -87,7 +87,9 @@ export async function POST(request: NextRequest) {
         });
 
         // Get AI response
-        const response = await SendMessage(conversation.messages, conversation.id);
+        const response = await SendMessageapi(conversation.messages, conversation.id);
+
+        console.log(response)
 
         // Save AI response with all required fields
         if (response?.content) {
@@ -102,6 +104,8 @@ export async function POST(request: NextRequest) {
                 }
             });
         }
+
+        
 
         return NextResponse.json({ 
             success: true, 
