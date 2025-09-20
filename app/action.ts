@@ -29,7 +29,9 @@ import { bookSlot } from './calender';
 import { TwilioPurchaser } from '@/functions/twilio';
 import { Item } from '@radix-ui/react-dropdown-menu';
 import SuccessScreen from '@/components/CSVImport/SuccessScreen';
-import smsScript from '@/prompts/stage1';
+import { getMessagesArray, getSelectedSlot, smsScript } from '@/prompts/stage1';
+import { extractSlotAndMessage } from '@/lib/utils';
+
 
 
 
@@ -1853,12 +1855,13 @@ No problem! Let me look at options starting from next Wednesday.
               //first type of mesag handele simpel uestion awnser
               if(data.status='TALKING'){
 
-                const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.8},systemInstruction:smsScript||chatRequest.systemPrompt});
+                const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' , generationConfig:{maxOutputTokens:1100,temperature:0.4},systemInstruction:chatRequest.systemPrompt});
            
                // Format the chat history for Gemini API
             
        
                // Create a chat session
+
                const chat = model.startChat({
                  history: [ ...history]
                         
@@ -2495,6 +2498,8 @@ const prompt=realEstateAgentPrompt
 const bot= await prisma.bot.findUnique({where:{id:botid}})
 
 
+const user= await getuser();
+
 
 
 
@@ -2516,12 +2521,57 @@ const bot= await prisma.bot.findUnique({where:{id:botid}})
   console.log(message,'message');
 
 
-  const response= await airesponseapifortesting({ messages: [ ...(message.map((item)=>{return({ role:item.sender,content:item.text})}))],systemPrompt:prompt},testchatid)
+
+
+
+
+
+
+
+
+  const  aiprompt = await smsScript(new Date(),user.id) 
+
+
+
+
+
+
+
+ 
+
+  const   response= await airesponseapifortesting({ messages: [ ...(message.map((item)=>{return({ role:item.sender,content:item.text})}))],systemPrompt:aiprompt||prompt},testchatid)
 
   
 
+if(response.message.includes('<selected_slot>')&&response.message.includes('</selected_slot>')){
+
   
-  return {role:'assistant', content:response.message}
+
+
+   const response2 = getSelectedSlot(response.message);
+
+
+  const slottime= response2.selectedSlot
+
+  
+  const booked =await prisma.testAppointment.create({data:{userId:user.id,scheduledAt:new Date(slottime)}})
+
+console.log('booked',booked)
+ 
+console.log(response , response2.message)
+
+
+const messagearr =getMessagesArray(response.message)
+
+
+return {role:'assistant', content:messagearr}
+
+}
+
+
+
+  
+  return {role:'assistant', content:getMessagesArray(response.message)}
   
   
 

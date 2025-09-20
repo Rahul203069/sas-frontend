@@ -47,6 +47,7 @@ import StatsCard from "./StatsCard";
 import ShowConfig from "./ShowConfig";
 import BotLogs from "./BotLogs";
 import BotLogsBox from "./BotlogBox";
+import ChatTest from "../chat/ChatTest";
 
 export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads, onSyncNow }) {
   const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -269,16 +270,16 @@ export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads,
         <Card className="border-slate-200/60 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex flex-wrap gap-3">
-              <ShowConfig config={bot}></ShowConfig>
+              {/* <ShowConfig config={bot}></ShowConfig> */}
 
-              <Button 
+              {/* <Button 
                 onClick={() => {router.push(`bot/${bot.id}&${bot.type}`)}}
                 variant="outline" 
                 className="flex items-center gap-2 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700"
               >
                 <Settings className="w-4 h-4" />
                 Configure Bot
-              </Button>
+              </Button> */}
 
               <Button 
                 onClick={() =>{router.push(`csv-upload/${bot.id}`)}}
@@ -290,7 +291,7 @@ export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads,
               </Button>
 
               <BotLogsBox></BotLogsBox>
-
+               <ChatTest></ChatTest>
               <Button 
                 onClick={handleSync}
                 disabled={isSyncing}
