@@ -31,6 +31,33 @@ SELLER
 }
 
 
+
+
+
+
+model MessageJobs {
+  id            String   @id @default(uuid())
+  userId        String
+  totalMessages Int
+  messageSent   Int
+  error         Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relation to User
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("messagejobs")
+}
+
+
+
+
+
+
+
+
+
 model notification {
   id          String   @id @default(uuid())
   userId      String
@@ -44,32 +71,39 @@ model notification {
 }
 
 model User {
-  id           String   @id @default(uuid()) @unique
-  email        String   @unique
-  name         String
-  password     String
-  role         Role     @default(ADMIN)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  image        String?
-  otp           String?
-  areacode      String?
-  phonenumber   String?
-   googlecalendarmetadata  Json?
-  timeZone   String?
-   bot       Bot[]
- 
-  availabaleSlots Json?
-  phoneverifed   Boolean @default(false)
-  // One-to-one relation with Twilio
-  twilio       Twilio?
+  id                      String   @id @default(uuid()) @unique
+  email                   String   @unique
+  name                    String
+  password                String
+  role                    Role     @default(ADMIN)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  image                  String?
+  otp                    String?
+  areacode               String?
+  phonenumber            String?
+  googlecalendarmetadata Json?
+  timeZone               String?
+  availabaleSlots        Json?
+  phoneverifed           Boolean  @default(false)
   
-  // Other relations
-  notifications notification[]
-  leads        Lead[]
-  conversations Conversation[]
-  appointments Appointment[]
-  chatSessions ChatSession[]
+  // One-to-one relation with Twilio
+  twilio                 Twilio?
+  
+  // One-to-many relations
+  bot                    Bot[]
+  notifications          notification[]
+  leads                  Lead[]
+  conversations          Conversation[]
+  appointments           Appointment[]
+  chatSessions           ChatSession[]
+  messageJobs            MessageJobs[]  // Added one-to-many relation
+}
+
+enum Role {
+  ADMIN
+  USER
+  MODERATOR
 }
 
 model Twilio {
@@ -90,10 +124,7 @@ model Twilio {
 }
 
 
-enum Role {
-  USER
-  ADMIN
-}
+
 
 model Lead {
   id              String      @id @default(uuid())
@@ -219,7 +250,7 @@ model Appointment {
   status       AppointmentStatus @default(PENDING)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
+  completed       Boolean @default(false) 
   lead         Lead @relation(fields: [leadId], references: [id])
   user         User @relation(fields: [userId], references: [id])
 }
@@ -324,6 +355,7 @@ enum AppointmentStatus {
   PENDING
   CONFIRMED
   CANCELED
+  COMPLETED
 }
 
 enum leadtype {

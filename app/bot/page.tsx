@@ -96,7 +96,7 @@ export default function Page() {
   const [selectedBot, setSelectedBot] = useState(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [testDialogOpen, setTestDialogOpen] = useState(false);
-
+const [metrics, setmetrics] = useState(null)
 
 const [create, setCreate] = useState(false);
   const [reload, setReload] = useState(false);
@@ -128,7 +128,9 @@ const [create, setCreate] = useState(false);
       const botList = await fetchBots();
       console.log(botList, "Loaded Bots");
 
-      setBots(botList);
+      setBots([botList.bot]);
+
+      setmetrics(botList.botmetrics);
     } catch (error) {
       toast({
         title: "Error",
@@ -142,7 +144,7 @@ const [create, setCreate] = useState(false);
 
   const handleChangeStatus = async (bot, newStatus) => {
     try {
-      await Bot.update(bot.id, { status: newStatus });
+      await Bots.update(bot.id, { status: newStatus });
       setBots(prev => prev.map(b => 
         b.id === bot.id ? { ...b, status: newStatus } : b
       ));
@@ -218,9 +220,9 @@ const [create, setCreate] = useState(false);
     }
   };
 
-  const buyerBot = bots.find(bot => bot.type === 'BUYER');
+
   const sellerBot = bots.find(bot => bot.type === 'SELLER');
-  const currentBot = activeBot === 'buyer' ? buyerBot : sellerBot;
+  const currentBot = sellerBot;
 
   if (loading) {
     return (
@@ -253,7 +255,7 @@ const [create, setCreate] = useState(false);
       <div className="p-4 sm:p-8 max-w-7xl mx-auto bg-gray-50">
       
         
-        <AnalyticsOverview />
+     
 
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">
@@ -264,15 +266,11 @@ const [create, setCreate] = useState(false);
           </p>
         </div>
 
-        <BotSelector 
-          activeBot={activeBot}
-          onBotChange={setActiveBot}
-          buyerBot={buyerBot}
-          sellerBot={sellerBot}
-        />
+   
 
         {currentBot ? (
           <BotCard
+          botmetrics={metrics}
             bot={currentBot}
             onChangeStatus={handleChangeStatus}
             onTestBot={handleTestBot}

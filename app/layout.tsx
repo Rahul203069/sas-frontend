@@ -16,7 +16,13 @@ import { SessionProvider } from "next-auth/react";
 import SessionWrapper from "@/components/SessionWrapper";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
+import { Poppins } from 'next/font/google'
 
+const poppins = Poppins({
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  subsets: ['latin'],
+  display: 'swap',
+})
 
 const prisma= new PrismaClient()
 
@@ -55,7 +61,7 @@ export default async function RootLayout({
       <script src="https://accounts.google.com/gsi/client" async defer></script>
 
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${poppins.className} `}
         >
 
         <SessionWrapper>

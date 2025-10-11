@@ -1,7 +1,11 @@
-import React, { useState } from "react";
+//@ts-nocheck
+"use client"
+import 
+ React, { use, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TrendingDown } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
@@ -48,8 +52,9 @@ import ShowConfig from "./ShowConfig";
 import BotLogs from "./BotLogs";
 import BotLogsBox from "./BotlogBox";
 import ChatTest from "../chat/ChatTest";
+import SmsStatusBox from "./SmsStatusBox";
 
-export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads, onSyncNow }) {
+export default function BotCard({botmetrics, bot, onChangeStatus, onTestBot, onImportLeads, onSyncNow }) {
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -108,6 +113,8 @@ export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads,
     setShowActivationDialog(false);
   };
 
+  console.log(botmetrics, "bot metrics in bot card");
+
   return (
     <>
       <div className="space-y-6 ">
@@ -117,36 +124,61 @@ export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads,
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             title="Leads Contacted"
-            value={bot.leads_contacted}
+            value={botmetrics?.totalLeadsContacted}
             icon={Users}
             color="blue"
             trend="up"
             trendValue="+12%"
+            tooltip="Total number of potential leads that have been contacted by the bot"
           />
+          
           <StatsCard
             title="Replies"
-            value={bot.replies}
+            value={botmetrics?.totalReplied}
             icon={MessageCircle}
             color="green"
             trend="up"
             trendValue="+8%"
+            tooltip="Number of leads who responded to the initial outreach messages"
           />
+          
           <StatsCard
             title="Calls Booked"
-            value={bot.calls_booked}
+            value={botmetrics?.callbooked}
             icon={Phone}
             color="amber"
             trend="up"
             trendValue="+15%"
+            tooltip="Total number of calls successfully scheduled with interested leads"
           />
+          
+          <StatsCard
+            title="Drop Off Rate"
+            value={`${botmetrics?.dropOffRate}%`}
+            icon={TrendingDown}
+            color="red"
+            trend="down"
+            trendValue="-3%"
+            tooltip="Percentage of leads who stopped responding during the conversation flow"
+          />
+        </div>
+
+        {/* Second Row - Response Rate and SMS Status */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <StatsCard
             title="Response Rate"
-            value={`${bot.leads_contacted > 0 ? Math.round((bot.replies / bot.leads_contacted) * 100) : 0}%`}
+            value={`${botmetrics?.responseRate}%`}
             icon={Activity}
             color="blue"
             trend="up"
             trendValue="+5%"
+            tooltip="Percentage of contacted leads who provided at least one response"
           />
+          
+          {/* SMS Status Box takes full available width */}
+          <div className="w-full">
+            <SmsStatusBox />
+          </div>
         </div>
 
         {/* Lead Quality Stats */}
@@ -165,7 +197,7 @@ export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads,
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-600">Hot Leads</p>
-                    <p className="text-2xl font-bold text-slate-900">{bot.hot_leads}</p>
+                    <p className="text-2xl font-bold text-slate-900">{botmetrics.leadstatus.HOT}</p>
                   </div>
                 </div>
               </div>
@@ -177,7 +209,7 @@ export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads,
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-600">Warm Leads</p>
-                    <p className="text-2xl font-bold text-slate-900">{bot.warm_leads}</p>
+                    <p className="text-2xl font-bold text-slate-900">{botmetrics.leadstatus.WARM}</p>
                   </div>
                 </div>
               </div>
@@ -189,7 +221,7 @@ export default function BotCard({ bot, onChangeStatus, onTestBot, onImportLeads,
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-600">Cold Leads</p>
-                    <p className="text-2xl font-bold text-slate-900">{bot.cold_leads}</p>
+                    <p className="text-2xl font-bold text-slate-900">{botmetrics.leadstatus.JUNK}</p>
                   </div>
                 </div>
               </div>

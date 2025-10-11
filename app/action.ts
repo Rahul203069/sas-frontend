@@ -2,7 +2,6 @@
 
 
 
-
 "use server"
 import { authOptions } from '@/lib/auth';
 import { error } from 'console';
@@ -847,11 +846,15 @@ if (!user) {
 
 
 
-const bot = await prisma.bot.findMany({
-  where:{userid:user.id},
+const bot = await prisma.bot.findFirst({
+  where:{userid:user.id,type:'SELLER'},
+
   include:{enrichment:true}
  
 })
+
+
+const botmetrics=await getdashboardlytics()
 
 // if(type&&type.toLowerCase().includes('seller')){
 //   const bot =await prisma.sellerBot.findUnique({where:{
@@ -887,7 +890,7 @@ const bot = await prisma.bot.findMany({
 // })
 
 
-return bot
+return {bot,botmetrics}
 
 
 
@@ -3122,3 +3125,222 @@ const {id} = await prisma.testdata.create({data:{name:'dcwdc',botid:ids}})
 
 return id
     }
+
+
+
+
+
+async function getLeadStatusCounts(userId: string) {
+  const leads = await prisma.lead.findMany({
+    where: { userId },
+    select: { status: true },
+  });
+
+  // Initialize counts
+  const counts = { JUNK: 0, WARM: 0, HOT: 0 };
+
+  // Loop through leads and count
+  leads.forEach((lead) => {
+    if (lead.status === "JUNK") counts.JUNK++;
+    if (lead.status === "WARM") counts.WARM++;
+    if (lead.status === "HOT") counts.HOT++;
+  });
+
+  return counts;
+}
+
+type LeadStatusCounts = {
+  JUNK: number;
+  WARM: number;
+  HOT: number;
+};
+
+export type DashboardAnalytics = {
+  leadstatus: LeadStatusCounts;
+  callbooked: number;
+  Leadsreplied: number;
+ initiatedCount:number;
+  callcompleted:number;
+   totalLeadsContacted: number;
+  responseRate: number; // percentage
+  avgTimeToFirstResponse: number; // in minutes
+  dropOffRate: number; // percentage
+  monthData?: MonthData[];
+}
+
+export async function getdashboardlytics(): Promise<DashboardAnalytics> {
+  const { userid }: { userid: string } = await getuser();
+
+  const leadstatus: LeadStatusCounts = await getLeadStatusCounts(userid);
+  const callbooked: number = await prisma.appointment.count({ where: { userId: userid } });
+  const Leadsreplied: number = await prisma.lead.count({
+    where: {
+      userId: userid,
+      NOT: { state: 'INITIATED' },
+    },
+  });
+
+
+  const initiatedCount = await prisma.lead.count({
+    where: {
+      userId:userid,
+      initiated: true,
+    },
+  });
+  const callcompleted = await prisma.appointment.count({where:{userId:userid, completed:true}})
+
+const smsMetrics = await getSmsMetrics(userid);
+
+  return { leadstatus, callbooked, Leadsreplied , initiatedCount, callcompleted, ...smsMetrics}; 
+}
+
+export type SmsMetrics = {
+  totalReplied: number;
+  totalLeadsContacted: number;
+  responseRate: number; // percentage
+  avgTimeToFirstResponse: number; // in minutes
+  dropOffRate: number; // percentage
+  monthData?: MonthData[];
+};
+
+export async function getSmsMetrics(userId: string): Promise<SmsMetrics> {
+  // 1. Total Leads Contacted
+  const totalLeadsContacted = await prisma.lead.count({
+    where: { userId, initiated: true },
+  });
+
+  // 2. Response Rate
+  const totalReplied = await prisma.lead.count({
+    where: {
+      userId,
+      state: { not: "INITIATED" },
+    },
+  });
+  const responseRate =
+    totalLeadsContacted > 0
+      ? Math.round((totalReplied / totalLeadsContacted) * 100)
+      : 0;
+
+  // 3. Time to First Response
+  const conversations = await prisma.conversation.findMany({
+    where: { userId },
+    include: { messages: true },
+  });
+
+  let totalDiff = 0;
+  let countDiffs = 0;
+  for (const conv of conversations) {
+    const botMsg = conv.messages.find((m) => m.sender === "AI");
+    const leadMsg = conv.messages.find((m) => m.sender === "LEAD");
+    if (botMsg && leadMsg) {
+      const diff =
+        (new Date(leadMsg.timestamp).getTime() -
+          new Date(botMsg.timestamp).getTime()) /
+        1000 /
+        60;
+      if (diff >= 0) {
+        totalDiff += diff;
+        countDiffs++;
+      }
+    }
+  }
+  const avgTimeToFirstResponse =
+    countDiffs > 0 ? Math.round(totalDiff / countDiffs) : 0;
+
+  // 4. Drop-off Rate
+  let dropOffCount = 0;
+  for (const conv of conversations) {
+    const leadMsgs = conv.messages.filter((m) => m.sender === "LEAD");
+    if (leadMsgs.length === 1) dropOffCount++;
+  }
+  const dropOffRate =
+    totalReplied > 0 ? Math.round((dropOffCount / totalReplied) * 100) : 0;
+
+
+    const monthData = await getMonthlyData(userId);
+
+
+
+  return {
+    totalLeadsContacted,
+    totalReplied,
+    responseRate,
+    avgTimeToFirstResponse,
+    dropOffRate,
+    ...monthData
+  };
+}
+
+
+type MonthData = {
+  month: string;
+  fullMonth: string;
+  callsBooked: number;
+  leadsEngaged: number;
+};
+
+const monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June', 
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+async function getMonthlyData(userId: string): Promise<MonthData[]> {
+  const currentYear = new Date().getFullYear();
+
+  // Fetch appointments per month
+  const appointments = await prisma.appointment.groupBy({
+    by: ['scheduledAt'],
+    where: {
+      userId,
+      scheduledAt: {
+ gte: new Date('2025-09-01'),  // 2025-09-01T00:00:00.000Z
+  lte: new Date('2025-09-30'),  // 2025-09-30T00:00:00.000Z -> excludes later times!
+      },
+   
+    },
+    _count: {
+      id: true,
+    },
+  });
+
+  console.log(appointments,'appointments')
+
+  // Fetch conversations per month
+  const conversations = await prisma.conversation.groupBy({
+    by: ['createdAt'],
+    where: {
+      userId,
+      createdAt: {
+        gte: new Date(`${currentYear}-01-01`),
+        lt: new Date(`${currentYear}-12-31`),
+      },
+    },
+    _count: {
+      id: true,
+    },
+  });
+
+  // Map data into MonthData[]
+  const monthlyData: MonthData[] = monthNames.map((fullMonth, idx) => {
+    const month = idx + 1; // 1-based month number
+
+    // Count appointments in this month
+    const callsBooked = appointments
+      .filter(app => app.scheduledAt.getMonth() + 1 === month)
+      .reduce((acc, app) => acc + app._count.id, 0);
+
+    // Count conversations in this month
+    const leadsEngaged = conversations
+      .filter(conv => conv.createdAt.getMonth() + 1 === month)
+      .reduce((acc, conv) => acc + conv._count.id, 0);
+
+    return {
+      month: fullMonth.slice(0, 3),
+      fullMonth,
+      callsBooked,
+      leadsEngaged,
+    };
+  });
+
+  return {monthlyData, callbooked:appointments.length};
+}
