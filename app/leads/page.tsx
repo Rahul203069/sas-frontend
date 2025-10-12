@@ -1,158 +1,281 @@
-//@ts-nocheck
 "use client";
-import React, { useState, useMemo } from 'react';
-import { Bot, Bell, Settings, User, Users, Upload } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import LeadCard from '@/components/LeadCard';
-import LeadFilters from '@/components/LeadFilters';
-import StatsOverview from '@/components/StatsOverview';
-import ChatHistoryModal from '@/components/ChatHistoryModal';
-import AISummaryModal from '@/components/AISummaryModal';
-import { mockLeads } from '@/data/mockLeads';
-import { Lead } from '@/type/lead';
-import Sidebarwrapper from '@/components/Sidebarwrapper';
-import LeadCards from '@/components/leads/leadscard';
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-function page() {
+import { Loader2, Upload } from "lucide-react";
+import { useRef } from "react";
+import leadsData from "@/lib/utils";
+import  FilterBar from "@/components/lead/FilterBar"
+import LeadsTable from "@/components/lead/LeadsTable"
+import TableSkeleton from "@/components/lead/TableSkeleton"
+import Pagination from "@/components/lead/Pagination";
+import ChatHistoryModal from "@/components/ChatHistoryModal";
+import AISummaryModal from "@/components/AISummaryModal";
+
+import InfoDialog from "@/components/lead/InfoDialog";
+
+import StatsCard from "@/components/bot/StatsCard";
+import StatsCads from "@/components/lead/StatusCad";
+import { set } from "date-fns";
+import Sidebarwrapper from "@/components/Sidebarwrapper";
+import LeadSkeleton from "@/components/lead/LeadSkeleton";
+import { getLeads } from "../action";
+import { all } from "axios";
+
+
+const ITEMS_PER_PAGE = 10;
+
+export default function LeadsPage() {
   const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('score');
-  const [selectedLeadForChat, setSelectedLeadForChat] = useState<Lead | null>(null);
-  const [selectedLeadForSummary, setSelectedLeadForSummary] = useState<Lead | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("-last_contacted");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [pagination, setpagination] = useState(null)
+  const [leadsCount, setleadsCount] = useState(null)
+  const [selectedLeadForChat, setSelectedLeadForChat] = useState(null);
+  const [selectedLeadForAI, setSelectedLeadForAI] = useState(null);
+  const [selectedLeadForInfo, setSelectedLeadForInfo] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
-  const filteredAndSortedLeads = useMemo(() => {
-    let filtered = mockLeads.filter(lead => {
-      const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           lead.company.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
+const [allLeads, setAllLeads] = useState([]);
+const [isLoading, setIsLoading] = useState(true);
 
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'score':
-          return b.score - a.score;
-        case 'interestLevel':
-          return b.interestLevel - a.interestLevel;
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'lastContact':
-          return new Date(b.lastContact).getTime() - new Date(a.lastContact).getTime();
-        default:
-          return 0;
+  const isFirstRender = useRef(true);
+
+
+
+
+
+
+useEffect(() => {
+
+ if (isFirstRender.current) {
+      isFirstRender.current = false; // skip first run
+      return;
+    }
+
+    setCurrentPage(1);
+
+ setIsFiltering(true)
+  
+
+getLeads({ sortby:sortBy,filterby:statusFilter,search:searchQuery,page:currentPage}).then((res)=>{
+if(res.success){
+console.log(res)
+  setAllLeads(res.data);
+
+  setpagination(res.pagination); 
+
+
+  setIsFiltering(false);
+}
+
+
+})
+
+ 
+}, [searchQuery, statusFilter, sortBy,currentPage]);
+
+
+
+
+ useEffect(() => {
+  
+   if (isFirstRender.current) {
+        isFirstRender.current = false; // skip first run
+        return;
       }
-    });
+  
+  
+   setIsLoading(true)
+    
+  
+  getLeads({ sortby:sortBy,filterby:statusFilter,search:searchQuery,page:currentPage}).then((res)=>{
 
-    return filtered;
-  }, [searchTerm, statusFilter, sortBy]);
 
-  const stats = useMemo(() => {
-    const totalLeads = mockLeads.length;
-    const hotLeads = mockLeads.filter(lead => lead.status === 'hot').length;
-    const warmLeads = mockLeads.filter(lead => lead.status === 'warm').length;
-    const coldLeads = mockLeads.filter(lead => lead.status === 'cold').length;
-    const totalMessages = mockLeads.reduce((sum, lead) => sum + lead.messageCount, 0);
-    const callsBooked = Math.floor(hotLeads * 0.7 + warmLeads * 0.3);
 
-    return { totalLeads, hotLeads, warmLeads, coldLeads, totalMessages, callsBooked };
+  if(res.success){
+  console.log(res)
+
+  
+   setpagination(res.pagination); 
+setleadsCount(res.leadstatusCounts
+)
+    setAllLeads(res.data);
+    setIsLoading(false);
+  }
+  
+  
+  })
+  
+   
   }, []);
+    
+    
 
-  const handleViewChat = (leadId: string) => {
-    const lead = mockLeads.find(l => l.id === leadId);
-    if (lead) {
-      setSelectedLeadForChat(lead);
-    }
+  // Simulate loading when filters change
+  
+  // const filteredAndSortedLeads = useMemo(() => {
+  //   let filtered = [...allLeads];
+
+  //   if (searchQuery) {
+  //     const query = searchQuery.toLowerCase();
+  //     filtered = filtered.filter(lead => 
+  //       lead.name?.toLowerCase().includes(query) ||
+  //       lead.email?.toLowerCase().includes(query) ||
+  //       lead.phone?.toLowerCase().includes(query) ||
+  //       lead.company?.toLowerCase().includes(query)
+  //     );
+  //   }
+
+  //   if (statusFilter !== "all") {
+  //     filtered = filtered.filter(lead => lead.status === statusFilter);
+  //   }
+
+  //   return filtered;
+  // }, [allLeads, searchQuery, statusFilter]);
+
+
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleViewSummary = (leadId: string) => {
-    const lead = mockLeads.find(l => l.id === leadId);
-    if (lead) {
-      setSelectedLeadForSummary(lead);
-    }
+  const handleImportClick = () => {
+    setIsRedirecting(true);
+    router.push('/csv-upload/2b805b86-1f5c-404e-8263-b0f3617054a2');
   };
 
-  const handleBookCall = (leadId: string) => {
-    console.log(`Booking call for lead ${leadId}`);
-  };
+  if (isLoading) {
+    return (
+      <Sidebarwrapper>
 
-  const handleImportLeads = () => {
-    router.push('/csv-upload/ssssssd');
-  };
+      <LeadSkeleton></LeadSkeleton>
+      </Sidebarwrapper>
+    );
+  }
 
   return (
     <Sidebarwrapper>
-      <div className="min-h-screen bg-gray-50/50">
-        {/* Header */}
-        <div className="p-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
-            <button
-              onClick={handleImportLeads}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
-            >
-              <Upload className="w-4 h-4" />
-              Import Leads
 
-            </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+      <div className="max-w-[1600px] mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Leads</h1>
+            <p className="text-gray-600 text-lg">Manage and track your sales leads</p>
           </div>
+          <button
+            onClick={handleImportClick}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+            disabled={isRedirecting}
+          >
+            {isRedirecting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <Upload className="w-5 h-5" />
+                Import Leads
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
-          {/* Stats Overview */}
-          <StatsOverview {...stats} />
+        {/* Stats Cards */}
+      <StatsCads leads={leadsCount} ></StatsCads>
 
-          {/* Filters */}
-          <LeadFilters
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            sortBy={sortBy}
-            onSortChange={setSortBy}
-          />
+        {/* Filter Bar */}
+        <FilterBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+        />
 
-          {/* Leads List */}
-          <div className="space-y-3">
-       
-            {filteredAndSortedLeads.map((lead) => (
-
-             <LeadCards key={Math.random()}  lead={lead}></LeadCards>
-            ))}
-          </div>
-
-          {filteredAndSortedLeads.length === 0 && (
-            <div className="text-center py-16">
-              <div className="text-gray-300 mb-4">
-                <Users className="w-12 h-12 mx-auto" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
-              <p className="text-gray-500 text-sm">Try adjusting your search or filter criteria.</p>
-            </div>
-          )}
-        </main>
-
-        {/* Modals */}
-        {selectedLeadForChat && (
-          <ChatHistoryModal
-          lead={selectedLeadForChat}
-            onClose={() => setSelectedLeadForChat(null)}
+        {/* Leads Table with Skeleton Loading */}
+        {isFiltering ? (
+          <TableSkeleton />
+        ) : allLeads.length > 0 ? (
+          <>
+            <LeadsTable
+              leads={allLeads}
+              onViewChat={setSelectedLeadForChat}
+              onViewAISummary={setSelectedLeadForAI}
+              onViewInfo={setSelectedLeadForInfo}
             />
-          )}
 
-        {selectedLeadForSummary && (
-          <AISummaryModal
-          lead={selectedLeadForSummary}
-          onClose={() => setSelectedLeadForSummary(null)}
-          />
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+                                            
+                      
+
+
+               <Pagination
+                currentPage={currentPage}
+                totalPages={pagination.totalPages}
+                onPageChange={handlePageChange}
+                totalItems={pagination.totalCount}
+                itemsPerPage={ITEMS_PER_PAGE}
+                               />
+
+                                                                 
+            )}
+          </>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🔍</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No leads found</h3>
+              <p className="text-gray-600">
+                {searchQuery || statusFilter !== "all"
+                  ? "Try adjusting your filters or search query"
+                  : "Start by adding your first lead"}
+              </p>
+            </div>
+          </div>
         )}
+
+        {/* Dialogs */}
+
+        {selectedLeadForChat &&
+        
+        <ChatHistoryModal
+        onClose={() => setSelectedLeadForChat(null)}
+        lead={selectedLeadForChat}
+        />
+
+      }
+        {selectedLeadForAI&& <AISummaryModal
+         
+          onClose={() => setSelectedLeadForAI(null)}
+          lead={selectedLeadForAI}
+        />}
+        
+
+        {selectedLeadForInfo&&
+        <InfoDialog
+       isOpen={true}
+        onClose={() => setSelectedLeadForInfo(
+          null)}
+          lead={selectedLeadForInfo}
+          />
+        }
       </div>
-    </Sidebarwrapper>
+ 
+    </div>
+ 
+ </Sidebarwrapper>
   );
 }
-
-export default page;

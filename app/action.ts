@@ -3344,3 +3344,256 @@ async function getMonthlyData(userId: string): Promise<MonthData[]> {
 
   return {monthlyData, callbooked:appointments.length};
 }
+
+
+
+export async function getLeads({
+  sortby,
+  filterby,
+  search,
+  page = 1,
+  pageSize = 10,
+}: {
+  sortby?: string;
+  filterby?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  try {
+    // Build the where clause
+    const where: any = {};
+
+    // Filter by status (HOT, COLD, WARM, etc.)
+    if (filterby && filterby !== 'all') {
+      // Convert COLD to JUNK
+      const statusValue = filterby.toUpperCase() === 'COLD' ? 'JUNK' : filterby.toUpperCase();
+      where.status = statusValue as LeadStatus;
+    }
+
+    // Search functionality - search in name, address, email, and phone
+    if (search && search.trim() !== '') {
+      where.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive', // Case-insensitive search
+          },
+        },
+        {
+          address: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          email: {
+            hasSome: [search], // Search in email array
+          },
+        },
+        {
+          phone: {
+            hasSome: [search], // Search in phone array
+          },
+        },
+      ];
+    }
+
+    // Build the orderBy clause
+    let orderBy: any = { createdAt: 'desc' }; // Default sort
+
+    if (sortby) {
+      // Handle sorting with - prefix for descending
+      const isDescending = sortby.startsWith('-');
+      const field = isDescending ? sortby.substring(1) : sortby;
+
+      // Map common sort fields
+      switch (field) {
+        case 'name':
+          orderBy = { name: isDescending ? 'desc' : 'asc' };
+          break;
+        case 'created':
+        case 'createdAt':
+          orderBy = { createdAt: isDescending ? 'desc' : 'asc' };
+          break;
+        case 'updated':
+        case 'updatedAt':
+          orderBy = { updatedAt: isDescending ? 'desc' : 'asc' };
+          break;
+        case 'status':
+          orderBy = { status: isDescending ? 'desc' : 'asc' };
+          break;
+        default:
+          orderBy = { createdAt: 'desc' };
+      }
+    }
+
+    // Calculate skip for pagination
+    const skip = (page - 1) * pageSize;
+
+    // Fetch leads with pagination
+    const [leads, totalCount] = await Promise.all([
+      prisma.lead.findMany({
+        where,
+        orderBy,
+        skip,
+        take: pageSize,
+        include: {
+          conversations:{select:{messages:true,id:true}},
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          bot: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          _count: {
+            select: {
+              contacts: true,
+              conversations: true,
+              appointments: true,
+            },
+          },
+        },
+      }),
+      // Get total count for pagination
+      prisma.lead.count({ where }),
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const hasNextPage = page < totalPages;
+    const hasPreviousPage = page > 1;
+
+
+    const leadstatusCounts = await getLeadStatusCounts();
+    return {
+      success: true,
+      data: leads,
+      leadstatusCounts,
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage,
+      },
+    };
+
+
+
+  } catch (error) {
+    console.error('Error fetching leads:', error);
+    return {
+      success: false,
+      error: 'Failed to fetch leads',
+      data: [],
+      pagination: {
+        page,
+        pageSize,
+        totalCount: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    };
+  }
+}
+
+
+
+
+export async function getLeadsStats() {
+  try {
+    // Build the where clause - optionally filter by userId
+
+
+
+const user= await getuser();
+
+const  userId=user.userid;
+    
+    // Get counts for each status using groupBy
+    const statusCounts = await prisma.lead.groupBy({
+      by: ['status'],
+      where,
+      _count: {
+        status: true,
+      },
+    });
+
+    // Initialize counts
+    let totalLeads = 0;
+    let hotLeads = 0;
+    let warmLeads = 0;
+    let junkLeads = 0;
+
+    // Process the grouped results
+    statusCounts.forEach((item) => {
+      const count = item._count.status;
+      totalLeads += count;
+
+      switch (item.status) {
+        case 'HOT':
+          hotLeads = count;
+          break;
+        case 'WARM':
+          warmLeads = count;
+          break;
+        case 'JUNK':
+        case 'COLD':
+          junkLeads += count;
+          break;
+      }
+    });
+
+    return {
+      success: true,
+      data: {
+        totalLeads,
+        hotLeads,
+        warmLeads,
+        junkLeads,
+        breakdown: {
+          HOT: hotLeads,
+          WARM: warmLeads,
+          JUNK: junkLeads,
+        },
+        percentages: {
+          hot: totalLeads > 0 ? ((hotLeads / totalLeads) * 100).toFixed(1) : '0.0',
+          warm: totalLeads > 0 ? ((warmLeads / totalLeads) * 100).toFixed(1) : '0.0',
+          junk: totalLeads > 0 ? ((junkLeads / totalLeads) * 100).toFixed(1) : '0.0',
+        },
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching leads stats:', error);
+    return {
+      success: false,
+      error: 'Failed to fetch leads statistics',
+      data: {
+        totalLeads: 0,
+        hotLeads: 0,
+        warmLeads: 0,
+        junkLeads: 0,
+        breakdown: {
+          HOT: 0,
+          WARM: 0,
+          JUNK: 0,
+        },
+        percentages: {
+          hot: '0.0',
+          warm: '0.0',
+          junk: '0.0',
+        },
+      },
+    };
+  }
+}

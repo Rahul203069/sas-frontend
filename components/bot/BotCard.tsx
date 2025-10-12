@@ -1,7 +1,4 @@
-//@ts-nocheck
-"use client"
-import 
- React, { use, useState } from "react";
+import React, { use, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -177,7 +174,7 @@ export default function BotCard({botmetrics, bot, onChangeStatus, onTestBot, onI
           
           {/* SMS Status Box takes full available width */}
           <div className="w-full">
-            <SmsStatusBox />
+            <SmsStatusBox  onRefresh={()=>{ console.log('refeeshing')}} />
           </div>
         </div>
 

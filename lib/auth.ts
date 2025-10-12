@@ -160,7 +160,7 @@ await prisma.bot.create({
       return session;
     },
     async redirect({ url, baseUrl }) {
-      return `${baseUrl}/onboarding`; // Redirect to /home after sign-in
+      return `${baseUrl}/dashboard`; // Redirect to /home after sign-in
     },
   },
 };
