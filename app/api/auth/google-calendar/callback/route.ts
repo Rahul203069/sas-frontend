@@ -49,7 +49,7 @@ export async function GET(req: Request) {
 
     oauth2Client.setCredentials(tokens);
 
-    return NextResponse.redirect("http://localhost:3000/appointment");
+    return NextResponse.redirect("http://localhost:3000/appointments");
   } catch (error) {
     console.error("Error fetching access token", error);
     return NextResponse.json({ error: "Failed to get access token" });

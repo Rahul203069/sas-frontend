@@ -45,39 +45,99 @@ const [isLoading, setIsLoading] = useState(true);
 
   const isFirstRender = useRef(true);
 
+  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+  const abortController = useRef<AbortController | null>(null);
 
 
 
 
 
-useEffect(() => {
 
- if (isFirstRender.current) {
-      isFirstRender.current = false; // skip first run
+
+
+
+
+
+  const triggerFetch = async () => {
+    setIsFiltering(true);
+
+    try {
+      const res = await getLeads({
+        sortby: sortBy,
+        filterby: statusFilter,
+        search: searchQuery,
+        page: currentPage,
+        
+      });
+
+      if (res.success) {
+        setAllLeads(res.data);
+        setpagination(res.pagination);
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Fetch error:", err);
+      }
+    } finally {
+      setIsFiltering(false);
+    }
+  };
+
+
+
+
+
+
+ useEffect(() => {
+    // Skip first render
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
       return;
     }
 
+    // Whenever something changes, reset page
     setCurrentPage(1);
 
- setIsFiltering(true)
+    // Cancel any ongoing fetch
+    if (abortController.current) {
+      abortController.current.abort();
+    }
+
+    // Start a new abort controller for the next request
+    abortController.current = new AbortController();
+
+    // If only searchQuery changed, debounce 300ms before calling getLeads
+    if (searchQuery !== "") {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
+      debounceTimeout.current = setTimeout(() => {
+        triggerFetch();
+      }, 300);
+    } else {
+      // If other filters or sort changed, fetch immediately
+      triggerFetch();
+    }
+
+    // Cleanup function (runs before next useEffect)
+    return () => {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+      if (abortController.current) abortController.current.abort();
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, statusFilter, sortBy, currentPage]);
+
   
 
-getLeads({ sortby:sortBy,filterby:statusFilter,search:searchQuery,page:currentPage}).then((res)=>{
-if(res.success){
-console.log(res)
-  setAllLeads(res.data);
-
-  setpagination(res.pagination); 
 
 
-  setIsFiltering(false);
-}
 
 
-})
 
- 
-}, [searchQuery, statusFilter, sortBy,currentPage]);
+
+
+
+
 
 
 

@@ -3171,7 +3171,9 @@ export type DashboardAnalytics = {
 export async function getdashboardlytics(): Promise<DashboardAnalytics> {
   const { userid }: { userid: string } = await getuser();
 
+  console.log(userid,'userid for analytics')
   const leadstatus: LeadStatusCounts = await getLeadStatusCounts(userid);
+
   const callbooked: number = await prisma.appointment.count({ where: { userId: userid } });
   const Leadsreplied: number = await prisma.lead.count({
     where: {
@@ -3179,6 +3181,7 @@ export async function getdashboardlytics(): Promise<DashboardAnalytics> {
       NOT: { state: 'INITIATED' },
     },
   });
+  console.log(callbooked, 'call booked');
 
 
   const initiatedCount = await prisma.lead.count({
@@ -3293,8 +3296,8 @@ async function getMonthlyData(userId: string): Promise<MonthData[]> {
     where: {
       userId,
       scheduledAt: {
- gte: new Date('2025-09-01'),  // 2025-09-01T00:00:00.000Z
-  lte: new Date('2025-09-30'),  // 2025-09-30T00:00:00.000Z -> excludes later times!
+ gte: new Date('2025-01-01'),  // 2025-09-01T00:00:00.000Z
+  lte: new Date('2025-12-30'),  // 2025-09-30T00:00:00.000Z -> excludes later times!
       },
    
     },
