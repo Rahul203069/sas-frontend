@@ -112,7 +112,7 @@ const [isLoading, setIsLoading] = useState(true);
 
       debounceTimeout.current = setTimeout(() => {
         triggerFetch();
-      }, 300);
+      }, 500);
     } else {
       // If other filters or sort changed, fetch immediately
       triggerFetch();
