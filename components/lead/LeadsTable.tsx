@@ -127,25 +127,26 @@ export default function LeadsTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onViewChat(lead)}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 cursor-pointer"
                       >
                         <MessageSquare className="w-4 h-4 mr-1" />
                         Chat
                       </Button>
                       <Button
+                      
                         variant="ghost"
                         size="sm"
                         onClick={() => onViewAISummary(lead)}
-                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-100 cursor-pointer"
                       >
                         <Sparkles className="w-4 h-4 mr-1" />
-                        AI Summary
+                          Chat Analysis
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onViewInfo(lead)}
-                        className="text-gray-600 hover:text-gray-700 hover:bg-gray-100"
+                        className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
                       >
                         <Info className="w-4 h-4" />
                       </Button>

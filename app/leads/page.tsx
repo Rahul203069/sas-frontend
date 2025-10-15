@@ -21,6 +21,8 @@ import Sidebarwrapper from "@/components/Sidebarwrapper";
 import LeadSkeleton from "@/components/lead/LeadSkeleton";
 import { getLeads } from "../action";
 import { all } from "axios";
+import LeadDetailModal from "@/components/ui/Combine";
+import CombinedModal from "@/components/ui/Combine";
 
 
 const ITEMS_PER_PAGE = 10;
@@ -57,90 +59,78 @@ const [isLoading, setIsLoading] = useState(true);
 
 
 
-// EFFECT 1: Reset the page when filters change
-useEffect(() => {
-  // Skip the first render to prevent resetting on initial load
-  if (isFirstRender.current) {
-    return;
-  }
 
-  // If any filter changes, reset to page 1
-  if (currentPage !== 1) {
+  const triggerFetch = async () => {
+    setIsFiltering(true);
+
+    try {
+      const res = await getLeads({
+        sortby: sortBy,
+        filterby: statusFilter,
+        search: searchQuery,
+        page: currentPage,
+        
+      });
+
+      if (res.success) {
+        setAllLeads(res.data);
+        setpagination(res.pagination);
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Fetch error:", err);
+      }
+    } finally {
+      setIsFiltering(false);
+    }
+  };
+
+
+
+
+
+
+ useEffect(() => {
+    // Skip first render
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Whenever something changes, reset page
     setCurrentPage(1);
-  }
 
-  // We don't run the fetch logic here, we just set the page.
-  // The next effect will handle the fetching.
-}, [searchQuery, statusFilter, sortBy]);
+    // Cancel any ongoing fetch
+    if (abortController.current) {
+      abortController.current.abort();
+    }
 
+    // Start a new abort controller for the next request
+    abortController.current = new AbortController();
 
-// EFFECT 2: Fetch data when filters OR page change
-useEffect(() => {
-  // On the very first render, isFirstRender is true, so this runs.
-  // After that, it runs whenever its dependencies change.
-  if (isFirstRender.current) {
-    isFirstRender.current = false;
-  }
+    // If only searchQuery changed, debounce 300ms before calling getLeads
+    if (searchQuery !== "") {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
-  // Cancel any ongoing fetch
-  if (abortController.current) {
-    abortController.current.abort();
-  }
+      debounceTimeout.current = setTimeout(() => {
+        triggerFetch();
+      }, 500);
+    } else {
+      // If other filters or sort changed, fetch immediately
+      triggerFetch();
+    }
 
-  // Start a new abort controller for the next request
-  abortController.current = new AbortController();
+    // Cleanup function (runs before next useEffect)
+    return () => {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+      if (abortController.current) abortController.current.abort();
+    };
 
-  const performFetch = () => {
-    // We pass the controller's signal to the fetch function
-    triggerFetch(abortController.current.signal);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, statusFilter, sortBy, currentPage]);
 
-  // Clear any previous debounce timer
-  if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-
-  // If the search query is being typed, debounce the request
-  // Otherwise, for filter/sort/page changes, fetch immediately
-  if (searchQuery !== "") {
-    debounceTimeout.current = setTimeout(performFetch, 800);
-  } else {
-    performFetch();
-  }
-
-  // Cleanup function
-  return () => {
-    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-    if (abortController.current) abortController.current.abort();
-  };
   
-  // This effect now correctly depends on all parameters that influence the fetch
-}, [searchQuery, statusFilter, sortBy, currentPage]);
 
-
-// You'll also need to slightly modify triggerFetch to accept the abort signal
-const triggerFetch = async (signal) => {
-  setIsFiltering(true);
-
-  try {
-    const res = await getLeads({
-      sortby: sortBy,
-      filterby: statusFilter,
-      search: searchQuery,
-      page: currentPage,
-       // Pass the signal to your API call function
-    });
-
-    if (res.success) {
-      setAllLeads(res.data);
-      setpagination(res.pagination);
-    }
-  } catch (err) {
-    if (err.name !== "AbortError") {
-      console.error("Fetch error:", err);
-    }
-  } finally {
-    setIsFiltering(false);
-  }
-};
 
 
 
@@ -329,10 +319,9 @@ setleadsCount(res.leadstatusCounts
         />
 
       }
-        {selectedLeadForAI&& <AISummaryModal
-         
-          onClose={() => setSelectedLeadForAI(null)}
+        {selectedLeadForAI&& <CombinedModal
           lead={selectedLeadForAI}
+          onClose={() => setSelectedLeadForAI(null)}
         />}
         
 
