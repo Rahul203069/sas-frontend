@@ -7,7 +7,7 @@ import { format } from "date-fns";
 
 const statusConfig = {
   HOT: {
-    color: "bg-red-50 text-red-700 border-red-200",
+    color: "bg-red-100 text-red-700 border-red-200",
     label: "Hot",
     icon: "🔥"
   },
@@ -146,7 +146,9 @@ export default function LeadsTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onViewInfo(lead)}
+
                         className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+
                       >
                         <Info className="w-4 h-4" />
                       </Button>
