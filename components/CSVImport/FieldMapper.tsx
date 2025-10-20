@@ -490,7 +490,7 @@ const FieldMapper: React.FC<FieldMapperProps> = ({ columns, onFieldsMapped }) =>
               )}
             </div>
             
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+            <div className="space-y-2  max-h-min overflow-y-auto pr-2">
               <AnimatePresence mode="popLayout">
                 {filteredUnmappedColumns.map((column) => (
                   <motion.div

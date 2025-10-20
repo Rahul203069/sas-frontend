@@ -28,25 +28,47 @@ const CSVUploader: React.FC<CSVUploaderProps> = ({ onFileLoaded, isLoading }) =>
       setError('Please upload a CSV file.');
       return false;
     }
-    
+
     if (file.size > 5 * 1024 * 1024) { // 5MB
       setError('File size exceeds 5MB limit.');
       return false;
     }
-    
+
     setError(null);
     return true;
+  };
+
+  // ✅ Core logic: Trim CSV to only first 20 rows
+  const handleFile = async (file: File) => {
+    if (!validateFile(file)) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const rows = text.split(/\r?\n/).filter(line => line.trim() !== '');
+
+      if (rows.length > 20) {
+        const trimmedRows = rows.slice(0, 20);
+        const trimmedText = trimmedRows.join('\n');
+        const trimmedBlob = new Blob([trimmedText], { type: 'text/csv' });
+        const trimmedFile = new File([trimmedBlob], file.name, { type: 'text/csv' });
+
+        setError(`Your file had ${rows.length} rows — only first 20 were uploaded.`);
+        onFileLoaded(trimmedFile);
+      } else {
+        setError(null);
+        onFileLoaded(file);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
     if (e.dataTransfer.files.length) {
       const file = e.dataTransfer.files[0];
-      if (validateFile(file)) {
-        onFileLoaded(file);
-      }
+      handleFile(file);
     }
   };
 
@@ -54,9 +76,7 @@ const CSVUploader: React.FC<CSVUploaderProps> = ({ onFileLoaded, isLoading }) =>
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      if (validateFile(file)) {
-        onFileLoaded(file);
-      }
+      handleFile(file);
     }
   };
 
@@ -86,7 +106,7 @@ const CSVUploader: React.FC<CSVUploaderProps> = ({ onFileLoaded, isLoading }) =>
           accept=".csv"
           onChange={handleFileChange}
         />
-        
+
         <AnimatePresence>
           {isLoading ? (
             <motion.div
@@ -114,7 +134,7 @@ const CSVUploader: React.FC<CSVUploaderProps> = ({ onFileLoaded, isLoading }) =>
               </motion.div>
               <h3 className="text-lg font-medium text-gray-900 mb-1">Upload CSV File</h3>
               <p className="text-gray-500 mb-4">Drag and drop your CSV file here or click to browse</p>
-              
+
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -124,9 +144,11 @@ const CSVUploader: React.FC<CSVUploaderProps> = ({ onFileLoaded, isLoading }) =>
                 <FileUp className="w-4 h-4 mr-2" />
                 Select CSV File
               </motion.button>
-              
-              <p className="mt-4 text-sm text-gray-500">Maximum file size: 5MB</p>
-              
+
+              <p className="mt-4 text-sm text-gray-500">
+                Maximum file size: 5MB | Only first 20 rows will be uploaded
+              </p>
+
               <AnimatePresence>
                 {error && (
                   <motion.div

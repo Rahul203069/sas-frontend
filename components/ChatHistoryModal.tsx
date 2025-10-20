@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, MessageCircle, User, Bot, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, MessageCircle, User, Bot, Clock, Loader2, AlertCircle, MessageSquareOff } from 'lucide-react';
 import { Lead } from '../type/lead';
+import { getchathistory } from '@/app/action';
 
 interface ChatHistoryModalProps {
   lead: Lead;
@@ -16,56 +17,52 @@ interface ChatMessage {
 }
 
 const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({ lead, onClose }) => {
-  // Mock chat data - in real app this would come from API
-  const chatMessages: ChatMessage[] = [
-    {
-      id: '1',
-      type: 'ai',
-      message: `Hi ${lead.name.split(' ')[0]}, I hope you're doing well! I wanted to reach out because I noticed ${lead.company} might benefit from our automation solutions. Would you be interested in a quick 15-minute call to discuss how we can help streamline your processes?`,
-      timestamp: '2024-01-15 09:30 AM',
-      status: 'read'
-    },
-    {
-      id: '2',
-      type: 'lead',
-      message: 'Hi! Thanks for reaching out. I\'m definitely interested in learning more about automation. What kind of solutions do you offer?',
-      timestamp: '2024-01-15 10:45 AM'
-    },
-    {
-      id: '3',
-      type: 'ai',
-      message: 'Great to hear! We specialize in workflow automation, customer communication systems, and data integration. Based on your company profile, I think our customer communication automation could save you significant time. Are you currently handling customer inquiries manually?',
-      timestamp: '2024-01-15 10:47 AM',
-      status: 'read'
-    },
-    {
-      id: '4',
-      type: 'lead',
-      message: 'Yes, we are! It\'s becoming quite time-consuming as we grow. How does your system work exactly?',
-      timestamp: '2024-01-15 11:15 AM'
-    },
-    {
-      id: '5',
-      type: 'ai',
-      message: 'Perfect! Our AI handles initial customer inquiries, qualifies leads, and can even schedule appointments automatically. It integrates with your existing CRM and can handle multiple communication channels. Would you like to see a demo? I can show you exactly how it would work for your business.',
-      timestamp: '2024-01-15 11:18 AM',
-      status: 'read'
-    },
-    {
-      id: '6',
-      type: 'lead',
-      message: 'That sounds exactly like what we need! Yes, I\'d love to see a demo. When would be a good time?',
-      timestamp: '2024-01-15 02:30 PM'
-    },
-    {
-      id: '7',
-      type: 'ai',
-      message: 'Excellent! I have availability this week on Wednesday at 2 PM or Friday at 10 AM. Which works better for you? The demo will take about 30 minutes and I\'ll show you real examples of how other companies like yours have benefited.',
-      timestamp: '2024-01-15 02:32 PM',
-      status: 'delivered'
-    }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
+  
+  const fetchMessages = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await getchathistory(lead.id);
+      
+console.log(data);
+
+      if (!data.success) {
+        setError('Failed to load chat history. Please try again.');
+        setLoading(false);
+        return;
+      }
+      
+      if (!data.messages || data.messages.length === 0) {
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
+      
+      const updatedMessages = data.messages.map((msg: any) => ({
+        id: msg.id,
+        type: msg.sender === 'AI' ? 'ai' : 'lead',
+        message: msg.content,
+        timestamp: msg.timestamp ,
+        status: 'delivered'
+      }));
+      //@ts-ignore
+      setMessages(updatedMessages);
+    } catch (err) {
+      console.error('Error fetching chat history:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
   const getMessageStatusIcon = (status?: string) => {
     switch (status) {
       case 'sent':
@@ -83,16 +80,14 @@ const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({ lead, onClose }) =>
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-gray-600">
-                {lead.name.split(' ').map(n => n[0]).join('')}
-              </span>
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <User className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Chat History</h2>
-              <p className="text-sm text-gray-500">{lead.name} • {lead.company}</p>
+              <h2 className="text-lg font-semibold text-gray-900">Chat with {lead.name}</h2>
+              <p className="text-sm text-gray-500">{lead.email}</p>
             </div>
           </div>
           <button
@@ -103,63 +98,110 @@ const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({ lead, onClose }) =>
           </button>
         </div>
 
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {chatMessages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-3 ${message.type === 'ai' ? 'justify-start' : 'justify-end'}`}
-            >
-              {message.type === 'ai' && (
-                <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-              )}
-              
-              <div className={`max-w-[70%] ${message.type === 'ai' ? 'order-2' : 'order-1'}`}>
-                <div
-                  className={`rounded-2xl px-4 py-3 ${
-                    message.type === 'ai'
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'bg-gray-900 text-white'
-                  }`}
+        {/* Chat Messages Area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Loading State */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-500">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
+              <p className="text-lg font-medium">Loading chat history...</p>
+              <p className="text-sm text-gray-400 mt-1">Please wait</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {!loading && error && (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md text-center">
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Messages</h3>
+                <p className="text-sm text-red-700 mb-4">{error}</p>
+                <button
+                  onClick={fetchMessages}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
-                  <p className="text-sm leading-relaxed">{message.message}</p>
-                </div>
-                <div className={`flex items-center gap-2 mt-1 px-2 ${
-                  message.type === 'ai' ? 'justify-start' : 'justify-end'
-                }`}>
-                  <span className="text-xs text-gray-500">{message.timestamp}</span>
-                  {message.type === 'ai' && message.status && (
-                    <div className="flex items-center gap-1">
-                      {getMessageStatusIcon(message.status)}
+                  Try Again
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* No Messages State */}
+          {!loading && !error && messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-500">
+              <MessageSquareOff className="w-16 h-16 text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Messages Yet</h3>
+              <p className="text-sm text-gray-500">No conversation history with this lead.</p>
+            </div>
+          )}
+
+          {/* Messages Display */}
+          {!loading && !error && messages.length > 0 && (
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${message.type === 'lead' ? 'justify-start' : 'justify-end'}`}
+                >
+                  {message.type === 'lead' && (
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User className="w-4 h-4 text-blue-600" />
+                    </div>
+                  )}
+                  
+                  <div className={`max-w-[70%] ${message.type === 'lead' ? 'order-2' : 'order-1'}`}>
+                    <div
+                      className={`rounded-2xl px-4 py-3 ${
+                        message.type === 'lead'
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'bg-blue-600 text-white'
+                      }`}
+                    >
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.message}</p>
+                    </div>
+                    <div className={`flex items-center gap-2 mt-1 px-2 ${
+                      message.type === 'lead' ? 'justify-start' : 'justify-end'
+                    }`}>
+                      <span className="text-xs text-gray-500">{message.timestamp}</span>
+                      {message.type === 'ai' && message.status && (
+                        <div className="flex items-center gap-1">
+                          {getMessageStatusIcon(message.status)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {message.type === 'ai' && (
+                    <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-white" />
                     </div>
                   )}
                 </div>
-              </div>
-
-              {message.type === 'lead' && (
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-blue-600" />
-                </div>
-              )}
+              ))}
             </div>
-          ))}
+          )}
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 bg-gray-50/50">
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="w-4 h-4" />
-              <span>{chatMessages.length} messages</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span>Last message: {lead.lastContact}</span>
+        {!loading && !error && (
+          <div className="p-6 border-t border-gray-200 bg-gray-50/50 flex-shrink-0">
+            <div className="flex items-center justify-between text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-4 h-4" />
+                <span>
+                  {messages.length > 0 
+                    ? `${messages.length} message${messages.length !== 1 ? 's' : ''} in conversation`
+                    : 'No messages yet'
+                  }
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                <span>Last contact: {lead.lastContact || 'Never'}</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

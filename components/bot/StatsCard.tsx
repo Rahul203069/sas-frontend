@@ -42,7 +42,7 @@ export default function StatsCard({
       <Card className="group hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 border-slate-200/60 overflow-visible">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-sm font-semibold text-slate-600 tracking-tight">
+            <CardTitle className="text-base font-semibold text-slate-600 tracking-tight">
               {title}
             </CardTitle>
             {tooltip && (

@@ -30,22 +30,42 @@ const CSVImport: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const params = useParams();
   const {userId}=params;
+  
   const handleFileLoaded = useCallback(async (file: File) => {
     setIsLoading(true);
     setError(null);
     
     try {
       const data = await parseCSV(file);
-      setCsvData(data);
+      console.log('Parsed CSV data:', data); // Debug log
       
-      const columns = getColumnSamples(data);
+      // Limit to first 20 items
+      // Handle different possible data structures
+      let limitedData;
+      if (Array.isArray(data)) {
+        // If data is directly an array
+        limitedData = data.slice(0, 20);
+      } else if (data.data && Array.isArray(data.data)) {
+        // If data has a 'data' property that's an array
+        limitedData = {
+          ...data,
+          data: data.data.slice(0, 20)
+        };
+      } else {
+        // Use data as is if structure is unknown
+        limitedData = data;
+      }
+      
+      setCsvData(limitedData);
+      
+      const columns = getColumnSamples(limitedData);
       setCsvColumns(columns);
       
       // Move to the next step
       setStep(2);
     } catch (err) {
       setError('Failed to parse CSV file. Please check the file format and try again.');
-      console.error(err);
+      console.error('CSV parse error:', err);
     } finally {
       setIsLoading(false);
     }

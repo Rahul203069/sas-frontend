@@ -3600,3 +3600,183 @@ const  userId=user.userid;
     };
   }
 }
+
+type AppointmentWithLead = Appointment & {
+  lead: Lead;
+};
+
+interface AppointmentStats {
+  totalCallsBooked: number;
+  totalCallsCompleted: number;
+  totalAppointmentsToday: number;
+  totalCompletedToday: number;
+}
+
+interface AppointmentsResponse {
+  success: boolean;
+  data: {
+    appointments: AppointmentWithLead[];
+    stats: AppointmentStats;
+  } | null;
+  error?: string;
+}
+
+interface AppointmentResponse {
+  success: boolean;
+  data: AppointmentWithLead[] | AppointmentWithLead | null;
+  error?: string;
+}
+
+/**
+ * Fetches all appointments with lead data and statistics for a specific user
+ * @param userId - The ID of the user
+ * @returns Appointments with lead data and various statistics
+ */
+export async function getAppointmentsWithStats(
+  userId?: string
+): Promise<AppointmentsResponse> {
+  try {
+    // Get userId from current user if not provided
+    let finalUserId = userId;
+    
+    if (!finalUserId) {
+      const user = await getuser();
+      if (!user || !user.id) {
+        return {
+          success: false,
+          error: "User not found or not authenticated",
+          data: null,
+        };
+      }
+      finalUserId = user.id;
+    }
+
+    // Get start and end of today
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // Fetch all appointments for the user with lead data
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        userId: finalUserId,
+      },
+      include: {
+        lead: true, // Include all lead data
+      },
+      orderBy: {
+        scheduledAt: 'desc', // Most recent first
+      },
+    });
+
+    // Calculate total calls booked
+    const totalCallsBooked: number = appointments.length;
+
+    // Calculate total calls completed
+    const totalCallsCompleted: number = appointments.filter(
+      (apt) => apt.completed === true || apt.status === 'COMPLETED'
+    ).length;
+
+    // Get appointments scheduled for today
+    const appointmentsToday = appointments.filter((apt) => {
+      const scheduledDate = new Date(apt.scheduledAt);
+      return scheduledDate >= startOfToday && scheduledDate <= endOfToday;
+    });
+
+    // Total appointments needed to attend today (scheduled for today and not completed)
+    const totalAppointmentsToday: number = appointmentsToday.filter(
+      (apt) => apt.completed === false && apt.status !== 'COMPLETED' && apt.status !== 'CANCELLED'
+    ).length;
+
+    // Total appointments completed today
+    const totalCompletedToday: number = appointmentsToday.filter(
+      (apt) => apt.completed === true || apt.status === 'COMPLETED'
+    ).length;
+
+
+
+    return {
+      success: true,
+      data: {
+        appointments,
+        stats: {
+          totalCallsBooked,
+          totalCallsCompleted,
+          totalAppointmentsToday,
+          totalCompletedToday,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching appointments:", error);
+    return {
+      success: false,
+      error: "Failed to fetch appointments",
+      data: null,
+    };
+  }
+}
+
+
+
+export async function updateAppointmentStatus(
+  appointmentId: string,
+  status: AppointmentStatus
+): Promise<AppointmentResponse> {
+  try {
+    const appointment = await prisma.appointment.update({
+      where: {
+        id: appointmentId,
+      },
+      data: {
+        status: status,
+        ...(status === 'COMPLETED' && { completed: true }),
+      },
+      include: {
+        lead: true,
+      },
+    });
+
+    return {
+      success: true,
+      data: appointment,
+    };
+  } catch (error) {
+    console.error("Error updating appointment status:", error);
+    return {
+      success: false,
+      error: "Failed to update appointment status",
+      data: null,
+    };
+  }
+}
+
+
+export async function getchathistory(leadid){
+
+
+  try{
+
+    
+    
+    const conversation = await prisma.conversation.findFirst({where:{leadId:leadid},include:{messages:true}})
+    console.log(conversation);
+    
+    return {
+      success:true,
+      messages:conversation.messages
+      
+    }
+  }catch(e){
+
+
+    return{
+      success:false,
+      error:e
+    }
+  }
+
+
+}

@@ -42,165 +42,69 @@ export default function LeadsPage() {
   const [selectedLeadForInfo, setSelectedLeadForInfo] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
 
-const [allLeads, setAllLeads] = useState([]);
-const [isLoading, setIsLoading] = useState(true);
-
-  const isFirstRender = useRef(true);
+  const [allLeads, setAllLeads] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
-  const abortController = useRef<AbortController | null>(null);
 
+  // Single useEffect to handle all fetching
+  useEffect(() => {
+    // Clear any existing timeout
+    if (debounceTimeout.current) {
+      clearTimeout(debounceTimeout.current);
+    }
 
+    // Determine delay based on whether search is active
+    const delay = searchQuery.length > 0 ? 500 : 0;
 
-
-
-
-
-
-
-
-
-  const triggerFetch = async () => {
+    // Set filtering state immediately for better UX
     setIsFiltering(true);
 
-    try {
-      const res = await getLeads({
-        sortby: sortBy,
-        filterby: statusFilter,
-        search: searchQuery,
-        page: currentPage,
-        
-      });
+    debounceTimeout.current = setTimeout(async () => {
+      try {
+        console.log('Fetching with params:', { 
+          sortBy, 
+          statusFilter, 
+          searchQuery, 
+          currentPage 
+        });
 
-      if (res.success) {
-        setAllLeads(res.data);
-        setpagination(res.pagination);
-      }
-    } catch (err) {
-      if (err.name !== "AbortError") {
+        const res = await getLeads({
+          sortby: sortBy,
+          filterby: statusFilter,
+          search: searchQuery,
+          page: currentPage,
+        });
+
+        if (res.success) {
+          setAllLeads(res.data);
+          setpagination(res.pagination);
+          
+          // Update leads count only if it exists in response
+          if (res.leadstatusCounts) {
+            setleadsCount(res.leadstatusCounts);
+          }
+        }
+      } catch (err) {
         console.error("Fetch error:", err);
+      } finally {
+        setIsFiltering(false);
+        setIsLoading(false);
       }
-    } finally {
-      setIsFiltering(false);
-    }
-  };
+    }, delay);
 
-
-
-
-
-
- useEffect(() => {
-    // Skip first render
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-
-    // Whenever something changes, reset page
-    setCurrentPage(1);
-
-    // Cancel any ongoing fetch
-    if (abortController.current) {
-      abortController.current.abort();
-    }
-
-    // Start a new abort controller for the next request
-    abortController.current = new AbortController();
-
-    // If only searchQuery changed, debounce 300ms before calling getLeads
-    if (searchQuery !== "") {
-      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-
-      debounceTimeout.current = setTimeout(() => {
-        triggerFetch();
-      }, 500);
-    } else {
-      // If other filters or sort changed, fetch immediately
-      triggerFetch();
-    }
-
-    // Cleanup function (runs before next useEffect)
+    // Cleanup function
     return () => {
-      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-      if (abortController.current) abortController.current.abort();
+      if (debounceTimeout.current) {
+        clearTimeout(debounceTimeout.current);
+      }
     };
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, sortBy, currentPage]);
 
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- useEffect(() => {
-  
-   if (isFirstRender.current) {
-        isFirstRender.current = false; // skip first run
-        return;
-      }
-  
-  
-   setIsLoading(true)
-    
-  
-  getLeads({ sortby:sortBy,filterby:statusFilter,search:searchQuery,page:currentPage}).then((res)=>{
-
-
-
-  if(res.success){
-  console.log(res)
-
-  
-   setpagination(res.pagination); 
-setleadsCount(res.leadstatusCounts
-)
-    setAllLeads(res.data);
-    setIsLoading(false);
-  }
-  
-  
-  })
-  
-   
-  }, []);
-    
-    
-
-  // Simulate loading when filters change
-  
-  // const filteredAndSortedLeads = useMemo(() => {
-  //   let filtered = [...allLeads];
-
-  //   if (searchQuery) {
-  //     const query = searchQuery.toLowerCase();
-  //     filtered = filtered.filter(lead => 
-  //       lead.name?.toLowerCase().includes(query) ||
-  //       lead.email?.toLowerCase().includes(query) ||
-  //       lead.phone?.toLowerCase().includes(query) ||
-  //       lead.company?.toLowerCase().includes(query)
-  //     );
-  //   }
-
-  //   if (statusFilter !== "all") {
-  //     filtered = filtered.filter(lead => lead.status === statusFilter);
-  //   }
-
-  //   return filtered;
-  // }, [allLeads, searchQuery, statusFilter]);
-
-
+  // Separate effect to reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, sortBy]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -212,131 +116,120 @@ setleadsCount(res.leadstatusCounts
     router.push('/csv-upload/2b805b86-1f5c-404e-8263-b0f3617054a2');
   };
 
+
   if (isLoading) {
     return (
       <Sidebarwrapper>
-
-      <LeadSkeleton></LeadSkeleton>
+        <LeadSkeleton></LeadSkeleton>
       </Sidebarwrapper>
     );
   }
 
   return (
     <Sidebarwrapper>
-
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-      <div className="max-w-[1600px] mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Leads</h1>
-            <p className="text-gray-600 text-lg">Manage and track your sales leads</p>
-          </div>
-          <button
-            onClick={handleImportClick}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-            disabled={isRedirecting}
-          >
-            {isRedirecting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Redirecting...
-              </>
-            ) : (
-              <>
-                <Upload className="w-5 h-5" />
-                Import Leads
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Stats Cards */}
-      <StatsCads leads={leadsCount} ></StatsCads>
-
-        {/* Filter Bar */}
-        <FilterBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
-        />
-
-        {/* Leads Table with Skeleton Loading */}
-        {isFiltering ? (
-          <TableSkeleton />
-        ) : allLeads.length > 0 ? (
-          <>
-            <LeadsTable
-              leads={allLeads}
-              onViewChat={setSelectedLeadForChat}
-              onViewAISummary={setSelectedLeadForAI}
-              onViewInfo={setSelectedLeadForInfo}
-            />
-
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-                                            
-                      
-
-
-               <Pagination
-                currentPage={currentPage}
-                totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
-                totalItems={pagination.totalCount}
-                itemsPerPage={ITEMS_PER_PAGE}
-                               />
-
-                                                                 
-            )}
-          </>
-        ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">🔍</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No leads found</h3>
-              <p className="text-gray-600">
-                {searchQuery || statusFilter !== "all"
-                  ? "Try adjusting your filters or search query"
-                  : "Start by adding your first lead"}
-              </p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+        <div className="max-w-[1600px] mx-auto">
+          {/* Header */}
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Leads</h1>
+              <p className="text-gray-600 text-lg">Manage and track your sales leads</p>
             </div>
+            <button
+              onClick={handleImportClick}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              disabled={isRedirecting}
+            >
+              {isRedirecting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-5 h-5" />
+                  Import Leads
+                </>
+              )}
+            </button>
           </div>
-        )}
 
-        {/* Dialogs */}
+          {/* Stats Cards */}
+          <StatsCads leads={leadsCount} ></StatsCads>
 
-        {selectedLeadForChat &&
-        
-        <ChatHistoryModal
-        onClose={() => setSelectedLeadForChat(null)}
-        lead={selectedLeadForChat}
-        />
-
-      }
-        {selectedLeadForAI&& <CombinedModal
-          lead={selectedLeadForAI}
-          onClose={() => setSelectedLeadForAI(null)}
-        />}
-        
-
-        {selectedLeadForInfo&&
-        <InfoDialog
-       isOpen={true}
-        onClose={() => setSelectedLeadForInfo(
-          null)}
-          lead={selectedLeadForInfo}
+          {/* Filter Bar */}
+          <FilterBar
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
           />
-        }
+
+          {/* Leads Table with Skeleton Loading */}
+          {isFiltering ? (
+            <TableSkeleton />
+          ) : allLeads.length > 0 ? (
+            <>
+              <LeadsTable
+                leads={allLeads}
+                onViewChat={setSelectedLeadForChat}
+                onViewAISummary={setSelectedLeadForAI}
+                onViewInfo={setSelectedLeadForInfo}
+              />
+
+              {/* Pagination */}
+              {pagination?.totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                  totalItems={pagination.totalCount}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                />
+              )}
+            </>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">🔍</span>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No leads found</h3>
+                <p className="text-gray-600">
+                  {searchQuery || statusFilter !== "all"
+                    ? "Try adjusting your filters or search query"
+                    : "Start by adding your first lead"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Dialogs */}
+          {selectedLeadForChat &&
+            <ChatHistoryModal
+              onClose={() => setSelectedLeadForChat(null)}
+              lead={selectedLeadForChat}
+            />
+          }
+          
+          {selectedLeadForAI && 
+            <CombinedModal
+              lead={selectedLeadForAI}
+              onClose={() => setSelectedLeadForAI(null)}
+            />
+          }
+
+          {selectedLeadForInfo &&
+            <InfoDialog
+              isOpen={true}
+              onClose={() => setSelectedLeadForInfo(null)}
+              lead={selectedLeadForInfo}
+            />
+          }
+        </div>
       </div>
- 
-    </div>
- 
- </Sidebarwrapper>
+    </Sidebarwrapper>
   );
 }
