@@ -50,7 +50,7 @@ console.log(data);
         timestamp: msg.timestamp ,
         status: 'delivered'
       }));
-      //@ts-ignore
+      //@ts-ignore 
       setMessages(updatedMessages);
     } catch (err) {
       console.error('Error fetching chat history:', err);

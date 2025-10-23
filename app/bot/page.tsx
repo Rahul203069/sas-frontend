@@ -269,6 +269,7 @@ const [create, setCreate] = useState(false);
    
 
         {currentBot ? (
+
           <BotCard
           botmetrics={metrics}
             bot={currentBot}
@@ -277,12 +278,17 @@ const [create, setCreate] = useState(false);
             onImportLeads={handleImportLeads}
             onSyncNow={handleSyncNow}
           />
+
+
         ) : (
           <Card className="border-dashed border-2 border-slate-300">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <BotIcon className="w-12 h-12 text-slate-400 mb-4" />
+
               <CardTitle className="text-slate-600 mb-2">
-                No {activeBot === 'buyer' ? 'Buyer' : 'Seller'} Bot Found
+
+                No {activeBot === 'buyer' ? 'Buyer' : 'Seller'} Bot Found   
+                 
               </CardTitle>
               <p className="text-slate-500 text-center mb-6">
                 Create a {activeBot} bot to start {activeBot === 'buyer' ? 'qualifying and managing purchase leads' : 'qualifying leads and booking sales calls'}

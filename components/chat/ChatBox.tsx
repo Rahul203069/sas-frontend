@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import MessageBubble from "./MessageBubble";
 import LeadInfoPanel from "./LeadInfoPanel";
 
-// --- Mock Data ---
+// --- Mock Data ---ec
 const mockLeads = [
   { id: 1, name: "John Doe", email: "john@example.com", phone: "1234567890", status: "new", notes: "Interested in property X" },
   { id: 2, name: "Jane Smith", email: "jane@example.com", phone: "9876543210", status: "contacted", notes: "" }

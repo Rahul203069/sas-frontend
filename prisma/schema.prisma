@@ -146,7 +146,7 @@ model Lead {
   owner           User        @relation(fields: [userId], references: [id])
   
   // Bot relation - botId is NOT unique, allowing multiple leads per bot
-  botId           String      // No @unique constraint = non-unique
+  botId           String
   bot             Bot         @relation(fields: [botId], references: [id])
   
   // Other relations
@@ -154,7 +154,28 @@ model Lead {
   conversations   Conversation[]
   appointments    Appointment[]
   chatSessions    ChatSession[]
+  property        Property?   // One-to-one: One lead can have ONE property (optional)
 }
+
+model Property {
+  id                String    @id @default(uuid())
+  propertyType      String?   // "House", "Condo", "Apartment", etc.
+  propertyAddress   String?
+  zipCode           String?
+  bedrooms          Int?
+  bathrooms         Float?    // Using Float to support values like 2.5
+  squareFootage     Int?
+  yearBuilt         Int?
+  lotSize           String?   // Storing as string to preserve formatting like "0.25 acres"
+  garageCount       Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Lead relation (one-to-one)
+  leadId            String    @unique  // @unique makes it one-to-one
+  lead              Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
 enum LeadStatus {
   HOT
   WARM

@@ -126,7 +126,9 @@ export default function BotLogsBox() {
   return (
     
     <>
-        <Button onClick={() => setIsLogDialogOpen(true)} size="lg" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+        <Button onClick={() => setIsLogDialogOpen(true)} size="lg"  className="flex items-center gap-2  hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700"
+            variant='outline'
+            >
            <ScrollText className="w-4 h-4" />
               Logs
      </Button>

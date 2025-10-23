@@ -1,9 +1,12 @@
 //@ts-nocheck
+
 "use client"
 import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Clock, Phone } from "lucide-react";
+
+
 
 import StatsCard from "@/components/bot/StatsCard";
 import AppointmentCard from "@/components/appointment/AppointmentCard";
@@ -14,6 +17,7 @@ import Sidebarwrapper from "@/components/Sidebarwrapper";
 import { getAppointmentsWithStats, updateAppointmentStatus } from "../action";
 import LeadSkeleton from "@/components/lead/LeadSkeleton";
 import { Fascinate } from "next/font/google";
+
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState([]);

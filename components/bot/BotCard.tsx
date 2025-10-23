@@ -174,7 +174,7 @@ export default function BotCard({botmetrics, bot, onChangeStatus, onTestBot, onI
           
           {/* SMS Status Box takes full available width */}
           <div className="w-full">
-            <SmsStatusBox  onRefresh={()=>{ console.log('refeeshing')}} />
+             <SmsStatusBox  onRefresh={()=>{ console.log('refeeshing')}} />
           </div>
         </div>
 
@@ -249,49 +249,7 @@ export default function BotCard({botmetrics, bot, onChangeStatus, onTestBot, onI
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                {/* Toggle Switch */}
-                <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <Power className={`w-4 h-4 ${bot.status === 'active' ? 'text-emerald-600' : 'text-slate-400'}`} />
-                  <Switch
-                    checked={bot.status === 'active'}
-                    onCheckedChange={handleToggleStatus}
-                    disabled={isChangingStatus}
-                    className="data-[state=checked]:bg-emerald-600"
-                  />
-                  <span className="text-sm font-medium text-slate-700">
-                    {bot.status === 'active' ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="border-slate-200/60">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => handleChangeStatus('active')}
-                      disabled={bot.status === 'active' || isChangingStatus}
-                      className="cursor-pointer"
-                    >
-                      <PlayCircle className="mr-2 h-4 w-4 text-emerald-600" />
-                      <span>Activate</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleChangeStatus('inactive')}
-                      disabled={bot.status === 'inactive' || isChangingStatus}
-                      className="cursor-pointer"
-                    >
-                      <PauseCircle className="mr-2 h-4 w-4 text-slate-600" />
-                      <span>Deactivate</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
+             </div>
           </CardHeader>
         </Card>
 
@@ -321,15 +279,7 @@ export default function BotCard({botmetrics, bot, onChangeStatus, onTestBot, onI
 
               <BotLogsBox></BotLogsBox>
                <ChatTest></ChatTest>
-              <Button 
-                onClick={handleSync}
-                disabled={isSyncing}
-                variant="outline"
-                className="flex items-center gap-2 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700"
-              >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? 'Syncing...' : 'Sync Now'}
-              </Button>
+             
             </div>
 
             {bot.last_sync && (
@@ -341,72 +291,9 @@ export default function BotCard({botmetrics, bot, onChangeStatus, onTestBot, onI
         </Card>
       </div>
 
-      {/* Status Change Confirmation Dialog */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Confirm Status Change
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to {pendingStatus === 'active' ? 'activate' : 'deactivate'} the bot "{bot.name}"?
-              {pendingStatus === 'inactive' && (
-                <span className="block mt-2 text-amber-600 font-medium">
-                  This will stop all ongoing conversations and lead outreach.
-                </span>
-              )}
-              {pendingStatus === 'active' && (
-                <span className="block mt-2 text-emerald-600 font-medium">
-                  This will resume bot operations and lead outreach.
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
-              onClick={cancelStatusChange}
-              disabled={isChangingStatus}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmStatusChange}
-              disabled={isChangingStatus}
-              className={`${
-                pendingStatus === 'active' 
-                  ? 'bg-emerald-600 hover:bg-emerald-700' 
-                  : 'bg-red-600 hover:bg-red-700'
-              }`}
-            >
-              {isChangingStatus ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  {pendingStatus === 'active' ? 'Activating...' : 'Deactivating...'}
-                </>
-              ) : (
-                <>
-                  {pendingStatus === 'active' ? (
-                    <PlayCircle className="w-4 h-4 mr-2" />
-                  ) : (
-                    <PauseCircle className="w-4 h-4 mr-2" />
-                  )}
-                  {pendingStatus === 'active' ? 'Activate Bot' : 'Deactivate Bot'}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+    
 
-      {/* Bot Activation Dialog */}
-      <BotActivationDialog
-        open={showActivationDialog}
-        onOpenChange={setShowActivationDialog}
-        botData={bot}
-        onSuccess={handleActivationSuccess}
-      />
+   
     </>
   );
 }

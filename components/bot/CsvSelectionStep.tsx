@@ -18,7 +18,6 @@ import { motion } from "framer-motion";
 
 
 
-
 const CsvFile = {
   "name": "CsvFile",
   "type": "object",
