@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Home, MapPin, Mail, Phone, User, Hash, Bed, Bath, Maximize, Calendar, Grid, Car } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
-export default function InfoDialog({ appointment, isOpen, onClose }) {
+export default function InfoDialog({ lead, isOpen, onClose }) {
 
   // --- START: DUMMY DATA FALLBACK ---
   const dummyData = {
@@ -32,7 +32,7 @@ export default function InfoDialog({ appointment, isOpen, onClose }) {
 
   // Use the real 'appointment' data, but fill in any missing keys with dummy data.
   // If 'appointment' is null/undefined, 'data' will just be the dummyData.
-  const data = { ...dummyData, ...appointment };
+  const data = { ...dummyData, ...lead };
   // --- END: DUMMY DATA FALLBACK ---
 
 

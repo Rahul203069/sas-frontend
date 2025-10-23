@@ -174,7 +174,7 @@ export default function BotCard({botmetrics, bot, onChangeStatus, onTestBot, onI
           
           {/* SMS Status Box takes full available width */}
           <div className="w-full">
-             <SmsStatusBox  onRefresh={()=>{ console.log('refeeshing')}} />
+             <SmsStatusBox  />
           </div>
         </div>
 
