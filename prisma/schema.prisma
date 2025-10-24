@@ -159,18 +159,18 @@ model Lead {
 
 model Property {
   id                String    @id @default(uuid())
-  propertyType      String?   // "House", "Condo", "Apartment", etc.
-  propertyAddress   String?
+  propertyType      String   // "House", "Condo", "Apartment", etc.
+  propertyAddress   String
   zipCode           String?
-  bedrooms          Int?
-  bathrooms         Float?    // Using Float to support values like 2.5
-  squareFootage     Int?
+  bedrooms          Int
+  bathrooms         Float    // Using Float to support values like 2.5
+  squareFootage     Int
   yearBuilt         Int?
   lotSize           String?   // Storing as string to preserve formatting like "0.25 acres"
   garageCount       Int?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  
+  isrequired 
   // Lead relation (one-to-one)
   leadId            String    @unique  // @unique makes it one-to-one
   lead              Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)

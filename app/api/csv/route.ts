@@ -16,7 +16,9 @@ export async function POST(request: NextRequest) {
         const session = await getServerSession(authOptions);
         const userid= session?.user?.id;
 
-        const {csvData,botId} = await request.json();
+        const {csvData,botId,urluserid} = await request.json();
+
+         
         if (!csvData) {
             return NextResponse.json({ error: 'Missing csvData or userId'},{status:400} );
         }
