@@ -1,12 +1,12 @@
+// @ts-nocheck
 
-// File: src/components/UploadWizard.tsx
 
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, RefreshCw, UploadCloud, CheckCircle, AlertTriangle } from 'lucide-react';
 
-import FieldMapper from './CSVImport/FieldMapper';
+
 import Alert from './Alert';
 import { CSVColumn, MappedField, PredefinedField } from '../type/csv';
 

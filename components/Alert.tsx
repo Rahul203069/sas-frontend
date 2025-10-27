@@ -8,12 +8,12 @@ import { AlertTriangle, CheckCircle, X } from 'lucide-react';
 interface AlertProps {
   type: 'success' | 'error';
   message: string;
-  onDismiss: () => void;
+ onDismiss: () => void;
 }
 
 const icons = {
-  success: <CheckCircle className="h-5 w-5 text-green-400" />,
-  error: <AlertTriangle className="h-5 w-5 text-red-400" />,
+ success: <CheckCircle className="h-5 w-5 text-green-400" />,
+ error: <AlertTriangle className="h-5 w-5 text-red-400" />,
 };
 
 const Alert: React.FC<AlertProps> = ({ type, message, onDismiss }) => {

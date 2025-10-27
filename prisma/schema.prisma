@@ -155,6 +155,30 @@ model Lead {
   appointments    Appointment[]
   chatSessions    ChatSession[]
   property        Property?   // One-to-one: One lead can have ONE property (optional)
+
+  Errors Errors[]
+}
+
+enum ErrorsType {
+  PROPERTYINFO_MISSING
+  VALIDATION_ERROR
+  PROCESSING_ERROR
+  EXTERNAL_API_ERROR
+  UNKNOWN_ERROR
+}
+
+
+model Errors {
+  id          String   @id @default(uuid())
+  leadId      String
+  type        ErrorsType
+  description String
+  leadids      String[]
+  leadsnames    String[]
+  message     String
+  timestamp   DateTime @default(now())
+
+  lead        Lead     @relation(fields: [leadId], references: [id])
 }
 
 model Property {
@@ -170,7 +194,7 @@ model Property {
   garageCount       Int?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  isrequired 
+  isrequired        Boolean   @default(false)
   // Lead relation (one-to-one)
   leadId            String    @unique  // @unique makes it one-to-one
   lead              Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
