@@ -6,16 +6,21 @@ import {
   X, MessageCircle, User, Bot, Brain, TrendingUp, 
   CheckCircle, AlertCircle, Target 
 } from 'lucide-react';
-import { set } from 'date-fns';
 
 // --- TYPE DEFINITIONS ---
-// These should ideally be in a central types file (e.g., types/index.ts)
-// but are included here for completeness.
 interface Lead {
   name: string;
   company: string;
   messageCount: number;
   lastContact: string;
+  conversations?: Array<{
+    messages: Array<{
+      id: string;
+      sender: string;
+      content: string;
+      timestamp: string;
+    }>;
+  }>;
 }
 
 interface ChatMessage {
@@ -39,59 +44,79 @@ interface AISummary {
 }
 
 // --- PROPS INTERFACE ---
-// This defines what properties the component expects to receive from its parent.
 interface CombinedModalProps {
-  lead: Lead;
+  lead: Lead | null;
   onClose: () => void;
 }
 
 // --- COMPONENT DEFINITION ---
 const CombinedModal: React.FC<CombinedModalProps> = ({ lead, onClose }) => {
-  // --- DYNAMIC MOCK DATA ---
-  // This data is now generated based on the `lead` prop passed into the component.
-  // In a real application, you would fetch this data using the lead's ID.
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  
+  useEffect(() => {
+    // Safely handle null or invalid lead data
+    if (!lead) {
+      setChatMessages([]);
+      return;
+    }
 
-
-  const [chatMessages, setchatMessages] = useState([])
-useEffect(() => {
-
-    
-    const messages=lead.conversations[0].messages;
-    
-     const chat= messages.map((msg:any)=>{
-    
-      return {
-          id: msg.id,
-          type: msg.sender === 'AI' ? 'ai' : 'lead',
-          message:msg.content,
-          timestamp: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          status: 'read' // Assuming status is part of the message object
+    try {
+      // Check if conversations array exists and has at least one conversation
+      const conversations = lead.conversations;
+      if (!Array.isArray(conversations) || conversations.length === 0) {
+        setChatMessages([]);
+        return;
       }
-    })
 
-    console.log(chat,"chatsups baby")
+      // Check if messages exist in the first conversation
+      const messages = conversations[0]?.messages;
+      if (!Array.isArray(messages)) {
+        setChatMessages([]);
+        return;
+      }
+      
+      const chat = messages.map((msg: any) => {
+        return {
+          id: msg?.id || `msg-${Date.now()}-${Math.random()}`,
+          type: msg?.sender === 'AI' ? 'ai' : 'lead',
+          message: msg?.content || '',
+          timestamp: msg?.timestamp 
+            ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : 'N/A',
+          status: 'read' as const
+        };
+      });
 
-    setchatMessages(chat)
-  }
-
-
-, [])
-
-
-
+      console.log(chat, "processed chat messages");
+      setChatMessages(chat);
+    } catch (error) {
+      console.error('Error processing lead messages:', error);
+      setChatMessages([]);
+    }
+  }, [lead]);
 
   const aiSummary: AISummary = {
-    overallAssessment: `${lead.name} shows strong interest in automation solutions and appears to be a qualified decision-maker at ${lead.company}. High likelihood of conversion with proper follow-up.`,
-    keyInsights: [ 'Currently handling customer inquiries manually', 'Company in growth phase seeking efficiency', 'Has decision-making authority' ],
-    interestSignals: [ 'Stated "That sounds exactly like what we need"', 'Asked for demo without hesitation' ],
-    concerns: [ 'May need to involve team members', 'Timeline not yet discussed' ],
-    recommendedActions: [
-      { priority: 'high', action: 'Schedule demo within 48 hours', reasoning: 'Lead is highly engaged and ready to see the product.' },
-      { priority: 'medium', action: 'Research their tech stack', reasoning: 'Better position our solution.' }
-    ]
+    overallAssessment: lead 
+      ? `${lead.name || 'This lead'} shows strong interest in automation solutions and appears to be a qualified decision-maker${lead.company ? ` at ${lead.company}` : ''}. High likelihood of conversion with proper follow-up.`
+      : 'No lead data available for analysis.',
+    keyInsights: lead 
+      ? ['Currently handling customer inquiries manually', 'Company in growth phase seeking efficiency', 'Has decision-making authority']
+      : [],
+    interestSignals: lead 
+      ? ['Stated "That sounds exactly like what we need"', 'Asked for demo without hesitation']
+      : [],
+    concerns: lead 
+      ? ['May need to involve team members', 'Timeline not yet discussed']
+      : [],
+    recommendedActions: lead 
+      ? [
+          { priority: 'high', action: 'Schedule demo within 48 hours', reasoning: 'Lead is highly engaged and ready to see the product.' },
+          { priority: 'medium', action: 'Research their tech stack', reasoning: 'Better position our solution.' }
+        ]
+      : []
   };
 
-  // --- HELPER FUNCTIONS (No changes needed) ---
+  // --- HELPER FUNCTIONS ---
   const getMessageStatusIcon = (status?: string) => {
     switch (status) {
       case 'read': return <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />;
@@ -116,15 +141,14 @@ useEffect(() => {
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-semibold text-lg">
-                {lead.name.split(' ').map(n => n[0]).join('')}
+                {lead?.name ? lead.name.split(' ').map(n => n[0]).join('') : '?'}
               </span>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">{lead.name}</h2>
-              <p className="text-sm text-gray-500">{lead.company}</p>
+              <h2 className="text-xl font-bold text-gray-900">{lead?.name || 'Unknown Lead'}</h2>
+              <p className="text-sm text-gray-500">{lead?.company || 'No company information'}</p>
             </div>
           </div>
-          {/* CORRECTED: The onClick now calls the function passed down from the parent */}
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
@@ -146,31 +170,38 @@ useEffect(() => {
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-gray-50/50 to-white">
-              {chatMessages?.map((message) => (
-                <div key={message.id} className={`flex gap-3 ${message.type === 'ai' ? 'justify-start' : 'justify-end'}`}>
-                  {message.type === 'ai' && (
-                    <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  
-                  <div className={`max-w-[75%] ${message.type === 'ai' ? 'order-2' : 'order-1'}`}>
-                    <div className={`rounded-2xl px-4 py-3 shadow-sm ${message.type === 'ai' ? 'bg-white border border-gray-200' : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'}`}>
-                      <p className="text-sm leading-relaxed">{message.message}</p>
-                    </div>
-                    <div className={`flex items-center gap-2 mt-1.5 px-2 ${message.type === 'ai' ? 'justify-start' : 'justify-end'}`}>
-                      <span className="text-xs text-gray-400">{message.timestamp}</span>
-                      {message.type === 'ai' && message.status && getMessageStatusIcon(message.status)}
-                    </div>
-                  </div>
-
-                  {message.type === 'lead' && (
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                  )}
+              {chatMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                  <MessageCircle className="w-12 h-12 mb-2 opacity-50" />
+                  <p className="text-sm">No messages available</p>
                 </div>
-              ))}
+              ) : (
+                chatMessages.map((message) => (
+                  <div key={message.id} className={`flex gap-3 ${message.type === 'ai' ? 'justify-start' : 'justify-end'}`}>
+                    {message.type === 'ai' && (
+                      <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                        <Bot className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    
+                    <div className={`max-w-[75%] ${message.type === 'ai' ? 'order-2' : 'order-1'}`}>
+                      <div className={`rounded-2xl px-4 py-3 shadow-sm ${message.type === 'ai' ? 'bg-white border border-gray-200' : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'}`}>
+                        <p className="text-sm leading-relaxed">{message.message}</p>
+                      </div>
+                      <div className={`flex items-center gap-2 mt-1.5 px-2 ${message.type === 'ai' ? 'justify-start' : 'justify-end'}`}>
+                        <span className="text-xs text-gray-400">{message.timestamp}</span>
+                        {message.type === 'ai' && message.status && getMessageStatusIcon(message.status)}
+                      </div>
+                    </div>
+
+                    {message.type === 'lead' && (
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -193,67 +224,77 @@ useEffect(() => {
                 <p className="text-sm text-gray-700 leading-relaxed">{aiSummary.overallAssessment}</p>
               </div>
 
-              {/* Key Insights, Signals, Concerns, Actions... */}
-              {/* (The rest of the JSX for the AI summary remains unchanged) */}
-              <div>
-                 <h4 className="text-sm font-semibold text-gray-900 mb-3">Key Insights</h4>
-                 <div className="space-y-2">
-                   {aiSummary.keyInsights.map((insight, index) => (
-                     <div key={index} className="flex items-start gap-2 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                       <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
-                       <p className="text-sm text-gray-700">{insight}</p>
-                     </div>
-                   ))}
-                 </div>
-               </div>
+              {/* Key Insights */}
+              {aiSummary.keyInsights.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Key Insights</h4>
+                  <div className="space-y-2">
+                    {aiSummary.keyInsights.map((insight, index) => (
+                      <div key={index} className="flex items-start gap-2 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                        <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
+                        <p className="text-sm text-gray-700">{insight}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-               <div>
-                 <div className="flex items-center gap-2 mb-3">
-                   <CheckCircle className="w-4 h-4 text-green-600" />
-                   <h4 className="text-sm font-semibold text-gray-900">Interest Signals</h4>
-                 </div>
-                 <div className="space-y-2">
-                   {aiSummary.interestSignals.map((signal, index) => (
-                     <div key={index} className="flex items-start gap-2 p-3 bg-green-50 rounded-lg border border-green-200 shadow-sm">
-                       <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 flex-shrink-0" />
-                       <p className="text-sm text-green-800">{signal}</p>
-                     </div>
-                   ))}
-                 </div>
-               </div>
-                
-               <div>
-                 <div className="flex items-center gap-2 mb-3">
-                   <AlertCircle className="w-4 h-4 text-amber-600" />
-                   <h4 className="text-sm font-semibold text-gray-900">Potential Concerns</h4>
-                 </div>
-                 <div className="space-y-2">
-                   {aiSummary.concerns.map((concern, index) => (
-                     <div key={index} className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200 shadow-sm">
-                       <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
-                       <p className="text-sm text-amber-800">{concern}</p>
-                     </div>
-                   ))}
-                 </div>
-               </div>
+              {/* Interest Signals */}
+              {aiSummary.interestSignals.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <h4 className="text-sm font-semibold text-gray-900">Interest Signals</h4>
+                  </div>
+                  <div className="space-y-2">
+                    {aiSummary.interestSignals.map((signal, index) => (
+                      <div key={index} className="flex items-start gap-2 p-3 bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 flex-shrink-0" />
+                        <p className="text-sm text-green-800">{signal}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Potential Concerns */}
+              {aiSummary.concerns.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <h4 className="text-sm font-semibold text-gray-900">Potential Concerns</h4>
+                  </div>
+                  <div className="space-y-2">
+                    {aiSummary.concerns.map((concern, index) => (
+                      <div key={index} className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200 shadow-sm">
+                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
+                        <p className="text-sm text-amber-800">{concern}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-               <div>
-                 <div className="flex items-center gap-2 mb-3">
-                   <Target className="w-4 h-4 text-blue-600" />
-                   <h4 className="text-sm font-semibold text-gray-900">Recommended Actions</h4>
-                 </div>
-                 <div className="space-y-3">
-                   {aiSummary.recommendedActions.map((action, index) => (
-                     <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border mb-2 ${getPriorityStyles(action.priority)}`}>
-                         {action.priority.toUpperCase()} PRIORITY
-                       </span>
-                       <h5 className="font-medium text-gray-900 mb-1 text-sm">{action.action}</h5>
-                       <p className="text-xs text-gray-600">{action.reasoning}</p>
-                     </div>
-                   ))}
-                 </div>
-               </div>
+              {/* Recommended Actions */}
+              {aiSummary.recommendedActions.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-sm font-semibold text-gray-900">Recommended Actions</h4>
+                  </div>
+                  <div className="space-y-3">
+                    {aiSummary.recommendedActions.map((action, index) => (
+                      <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border mb-2 ${getPriorityStyles(action.priority)}`}>
+                          {action.priority.toUpperCase()} PRIORITY
+                        </span>
+                        <h5 className="font-medium text-gray-900 mb-1 text-sm">{action.action}</h5>
+                        <p className="text-xs text-gray-600">{action.reasoning}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -264,7 +305,7 @@ useEffect(() => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <MessageCircle className="w-4 h-4" />
-                <span>{lead.messageCount} messages</span>
+                <span>{lead?.messageCount || 0} messages</span>
               </div>
               <div className="flex items-center gap-2">
                 <Brain className="w-4 h-4" />
